@@ -166,7 +166,7 @@ func (d *Driver) GetCreateFlags() []mcnflag.Flag {
 		mcnflag.StringFlag{
 			EnvVar: "OS_NETWORK_ID",
 			Name:   "openstack-net-id",
-			Usage:  "OpenStack comma seperated network id(s) the machine will be connected on",
+			Usage:  "OpenStack comma seperated network id(s) the machine will be connected on. (If floating ip pool is given, driver tries to find connected port in order of given networks to update floating ip)",
 			Value:  "",
 		},
 		mcnflag.StringFlag{
@@ -184,7 +184,7 @@ func (d *Driver) GetCreateFlags() []mcnflag.Flag {
 		mcnflag.StringFlag{
 			EnvVar: "OS_NETWORK_NAME",
 			Name:   "openstack-net-name",
-			Usage:  "OpenStack comma seperated network name(s) the machine will be connected on",
+			Usage:  "OpenStack comma seperated network name(s) the machine will be connected on. (If floating ip pool is given, driver tries to find connected port in order of given networks to update floating ip)",
 			Value:  "",
 		},
 		mcnflag.StringFlag{
