@@ -170,16 +170,6 @@ func (a AzureClient) galleryImageVersionsClient() compute.GalleryImageVersionsCl
 	return c
 }
 
-func (a AzureClient) resourceSkusClient() compute.ResourceSkusClient {
-	c := compute.NewResourceSkusClientWithBaseURI(a.env.ResourceManagerEndpoint, a.subscriptionID)
-	c.Authorizer = a.auth
-	c.Client.UserAgent += fmt.Sprintf(";docker-machine/%s", version.Version)
-	c.RequestInspector = withInspection()
-	c.ResponseInspector = byInspecting()
-	c.PollingDelay = defaultClientPollingDelay
-	return c
-}
-
 func (a AzureClient) disksClient() compute.DisksClient {
 	c := compute.NewDisksClientWithBaseURI(a.env.ResourceManagerEndpoint, a.subscriptionID)
 	c.Authorizer = a.auth
