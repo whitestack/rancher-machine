@@ -363,7 +363,6 @@ func (d *Driver) PreCreateCheck() (err error) {
 		"Microsoft.Compute",
 		"Microsoft.Network",
 		"Microsoft.Storage",
-		"Microsoft.Subscription",
 		"Microsoft.Resources"); err != nil {
 		return err
 	}
