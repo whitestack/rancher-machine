@@ -324,11 +324,6 @@ func (d *Driver) SetConfigFromFlags(fl drivers.DriverOptions) error {
 	d.UpdateCount = fl.Int(flAzureUpdateDomainCount)
 	d.DiskSize = fl.Int(flAzureDiskSize)
 	d.NSG = fl.String(flAzureNSG)
-	var err error
-	d.nsgUsedInPool = len(d.NSG) > 0
-	if d.nsgResource, err = d.resolveNSGReference(d.NSG); err != nil {
-		return err
-	}
 
 	d.ClientID = fl.String(flAzureClientID)
 	d.ClientSecret = fl.String(flAzureClientSecret)
@@ -414,6 +409,10 @@ func (d *Driver) Create() error {
 		}
 		customData = base64.StdEncoding.EncodeToString(buf)
 	}
+	d.nsgUsedInPool = len(d.NSG) > 0
+	if d.nsgResource, err = d.resolveNSGReference(d.NSG); err != nil {
+		return err
+	}
 
 	if err := c.CreateResourceGroup(ctx, d.ResourceGroup, d.Location); err != nil {
 		return err
@@ -481,6 +480,10 @@ func (d *Driver) Remove() error {
 	ctx := context.Background()
 	c, err := d.newAzureClient(ctx)
 	if err != nil {
+		return err
+	}
+	d.nsgUsedInPool = len(d.NSG) > 0
+	if d.nsgResource, err = d.resolveNSGReference(d.NSG); err != nil {
 		return err
 	}
 
