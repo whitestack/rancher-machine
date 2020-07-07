@@ -154,7 +154,7 @@ func (d *Driver) createCloudInitIso() error {
 		return err
 	}
 
-	md := []byte(fmt.Sprintf("#local-hostname: %s\n", d.MachineName))
+	md := []byte(fmt.Sprintf("local-hostname: %s\n", d.MachineName))
 	if err = ioutil.WriteFile(metadata, md, perm); err != nil {
 		return err
 	}
