@@ -218,7 +218,6 @@ func (d *Driver) createFromVmName() error {
 	spec := types.VirtualMachineCloneSpec{
 		Location: loc,
 		Config: &types.VirtualMachineConfigSpec{
-			GuestId:    "otherLinux64Guest",
 			NumCPUs:    int32(d.CPU),
 			MemoryMB:   int64(d.Memory),
 			VAppConfig: d.getVAppConfig(),
