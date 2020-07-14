@@ -126,8 +126,8 @@ type Driver struct {
 	DisableSSL              bool
 	UserDataFile            string
 	EncryptEbsVolume        bool
-
-	spotInstanceRequestId string
+	spotInstanceRequestId   string
+	KmsKeyId                string
 }
 
 type clientFactory interface {
@@ -299,6 +299,12 @@ func (d *Driver) GetCreateFlags() []mcnflag.Flag {
 			Usage:  "Encrypt the EBS volume using the AWS Managed CMK",
 			EnvVar: "AWS_ENCRYPT_EBS_VOLUME",
 		},
+		mcnflag.StringFlag{
+			Name:   "amazonec2-kms-key",
+			Usage:  "Custom KMS key using the AWS Managed CMK",
+			Value:  "alias/aws/ebs",
+			EnvVar: "AWS_KMS_KEY",
+		},
 	}
 }
 
@@ -397,6 +403,7 @@ func (d *Driver) SetConfigFromFlags(flags drivers.DriverOptions) error {
 	d.OpenPorts = flags.StringSlice("amazonec2-open-port")
 	d.UserDataFile = flags.String("amazonec2-userdata")
 	d.EncryptEbsVolume = flags.Bool("amazonec2-encrypt-ebs-volume")
+	d.KmsKeyId = flags.String("amazonec2-kms-key")
 
 	d.DisableSSL = flags.Bool("amazonec2-insecure-transport")
 
@@ -606,6 +613,7 @@ func (d *Driver) innerCreate() error {
 			VolumeType:          aws.String(d.VolumeType),
 			DeleteOnTermination: aws.Bool(true),
 			Encrypted:           aws.Bool(d.EncryptEbsVolume),
+			KmsKeyId:            aws.String(d.KmsKeyId),
 		},
 	}
 	netSpecs := []*ec2.InstanceNetworkInterfaceSpecification{{
