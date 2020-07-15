@@ -223,7 +223,7 @@ func decideStorageDriver(p Provisioner, defaultDriver, suppliedDriver string) (s
 		}
 	}()
 
-	if defaultDriver != "overlay2" {
+	if defaultDriver != DefaultStorageDriver {
 		bestSuitedDriver = defaultDriver
 	} else {
 		remoteFilesystemType, err := getFilesystemType(p, "/var/lib")
@@ -233,7 +233,7 @@ func decideStorageDriver(p Provisioner, defaultDriver, suppliedDriver string) (s
 		if remoteFilesystemType == "btrfs" {
 			bestSuitedDriver = "btrfs"
 		} else {
-			bestSuitedDriver = "overlay2"
+			bestSuitedDriver = DefaultStorageDriver
 		}
 	}
 	return bestSuitedDriver, nil
