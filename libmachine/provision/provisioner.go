@@ -19,6 +19,7 @@ var (
 
 const (
 	LastReleaseBeforeCEVersioning = "1.13.1"
+	DefaultStorageDriver          = "overlay2"
 )
 
 type SSHCommander interface {

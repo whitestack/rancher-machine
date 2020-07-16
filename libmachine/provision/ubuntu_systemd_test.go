@@ -38,7 +38,7 @@ func TestUbuntuSystemdDefaultStorageDriver(t *testing.T) {
 	p := NewUbuntuSystemdProvisioner(&fakedriver.Driver{}).(*UbuntuSystemdProvisioner)
 	p.SSHCommander = provisiontest.NewFakeSSHCommander(provisiontest.FakeSSHCommanderOptions{})
 	p.Provision(swarm.Options{}, auth.Options{}, engine.Options{})
-	if p.EngineOptions.StorageDriver != "aufs" {
-		t.Fatal("Default storage driver should be aufs")
+	if p.EngineOptions.StorageDriver != DefaultStorageDriver {
+		t.Fatalf("Default storage driver should be %s", DefaultStorageDriver)
 	}
 }

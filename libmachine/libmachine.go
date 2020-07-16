@@ -75,7 +75,7 @@ func (api *Client) NewHost(driverName string, rawDriver []byte) (*host.Host, err
 			},
 			EngineOptions: &engine.Options{
 				InstallURL:    drivers.DefaultEngineInstallURL,
-				StorageDriver: "aufs",
+				StorageDriver: provision.DefaultStorageDriver,
 				TLSVerify:     true,
 			},
 			SwarmOptions: &swarm.Options{
