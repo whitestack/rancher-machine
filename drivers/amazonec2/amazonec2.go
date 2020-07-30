@@ -73,6 +73,8 @@ var (
 	errorNoSubnetsFound                  = errors.New("The desired subnet could not be located in this region. Is '--amazonec2-subnet-id' or AWS_SUBNET_ID configured correctly?")
 	errorDisableSSLWithoutCustomEndpoint = errors.New("using --amazonec2-insecure-transport also requires --amazonec2-endpoint")
 	errorReadingUserData                 = errors.New("unable to read --amazonec2-userdata file")
+	errorInvalidValueForHTTPToken        = errors.New("httpToken must be either optional or required")
+	errorInvalidValueForHTTPEndpoint     = errors.New("httpEndpoint must be either enabled or disabled")
 )
 
 type Driver struct {
@@ -128,6 +130,10 @@ type Driver struct {
 	EncryptEbsVolume        bool
 	spotInstanceRequestId   string
 	kmsKeyId                *string
+
+	// Metadata Options
+	HttpEndpoint string
+	HttpTokens   string
 }
 
 type clientFactory interface {
@@ -304,6 +310,16 @@ func (d *Driver) GetCreateFlags() []mcnflag.Flag {
 			Usage:  "Custom KMS key using the AWS Managed CMK",
 			EnvVar: "AWS_KMS_KEY",
 		},
+		mcnflag.StringFlag{
+			Name:   "amazonec2-http-endpoint",
+			Usage:  "Enables or disables the HTTP metadata endpoint on your instances",
+			EnvVar: "AWS_HTTP_ENDPOINT",
+		},
+		mcnflag.StringFlag{
+			Name:   "amazonec2-http-tokens",
+			Usage:  "The state of token usage for your instance metadata requests.",
+			EnvVar: "AWS_HTTP_TOKENS",
+		},
 	}
 }
 
@@ -402,6 +418,22 @@ func (d *Driver) SetConfigFromFlags(flags drivers.DriverOptions) error {
 	d.OpenPorts = flags.StringSlice("amazonec2-open-port")
 	d.UserDataFile = flags.String("amazonec2-userdata")
 	d.EncryptEbsVolume = flags.Bool("amazonec2-encrypt-ebs-volume")
+
+	httpEndpoint := flags.String("amazonec2-http-endpoint")
+	if httpEndpoint != "" {
+		if httpEndpoint != "disabled" && httpEndpoint != "enabled" {
+			return errorInvalidValueForHTTPEndpoint
+		}
+		d.HttpEndpoint = httpEndpoint
+	}
+
+	httpTokens := flags.String("amazonec2-http-tokens")
+	if httpTokens != "" {
+		if httpTokens != "optional" && httpTokens != "required" {
+			return errorInvalidValueForHTTPToken
+		}
+		d.HttpTokens = httpTokens
+	}
 
 	kmskeyid := flags.String("amazonec2-kms-key")
 	if kmskeyid != "" {
@@ -751,6 +783,17 @@ func (d *Driver) innerCreate() error {
 	}
 
 	d.waitForInstance()
+
+	if d.HttpEndpoint != "" || d.HttpTokens != "" {
+		_, err := d.getClient().ModifyInstanceMetadataOptions(&ec2.ModifyInstanceMetadataOptionsInput{
+			InstanceId:   aws.String(d.InstanceId),
+			HttpEndpoint: aws.String(d.HttpEndpoint),
+			HttpTokens:   aws.String(d.HttpTokens),
+		})
+		if err != nil {
+			return fmt.Errorf("Error modifying instance metadata options for instance: %s", err)
+		}
+	}
 
 	log.Debugf("created instance ID %s, IP address %s, Private IP address %s",
 		d.InstanceId,

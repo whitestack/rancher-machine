@@ -9,6 +9,8 @@ type Ec2Client interface {
 
 	CreateTags(input *ec2.CreateTagsInput) (*ec2.CreateTagsOutput, error)
 
+	ModifyInstanceMetadataOptions(input *ec2.ModifyInstanceMetadataOptionsInput) (*ec2.ModifyInstanceMetadataOptionsOutput, error)
+
 	//SecurityGroup
 
 	CreateSecurityGroup(input *ec2.CreateSecurityGroupInput) (*ec2.CreateSecurityGroupOutput, error)
