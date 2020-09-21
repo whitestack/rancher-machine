@@ -29,7 +29,7 @@ func (d *Driver) getVmFolder(vm *object.VirtualMachine) (string, error) {
 
 	p := mvm.Summary.Config.VmPathName
 	sp := strings.Split(p, "]")
-	path := strings.Replace(sp[1], fmt.Sprintf("/%s.vmx", d.MachineName), "", 1)
+	path := strings.TrimSpace(strings.Replace(sp[1], fmt.Sprintf("/%s.vmx", d.MachineName), "", 1))
 
 	return path, nil
 }
