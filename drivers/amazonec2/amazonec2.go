@@ -37,7 +37,6 @@ const (
 	defaultAmiId                = "ami-c60b90d1"
 	defaultRegion               = "us-east-1"
 	defaultInstanceType         = "t2.micro"
-	defaultDeviceName           = "/dev/sda1"
 	defaultRootSize             = 16
 	defaultVolumeType           = "gp2"
 	defaultZone                 = "a"
@@ -213,7 +212,6 @@ func (d *Driver) GetCreateFlags() []mcnflag.Flag {
 		mcnflag.StringFlag{
 			Name:   "amazonec2-device-name",
 			Usage:  "AWS root device name",
-			Value:  defaultDeviceName,
 			EnvVar: "AWS_DEVICE_NAME",
 		},
 		mcnflag.IntFlag{
@@ -513,7 +511,7 @@ func (d *Driver) DriverName() string {
 	return driverName
 }
 
-func (d *Driver) checkPrereqs() error {
+func (d *Driver) checkSubnet() error {
 	regionZone := d.getRegionZone()
 	if d.SubnetId == "" {
 		filters := []*ec2.Filter{
@@ -554,8 +552,36 @@ func (d *Driver) checkPrereqs() error {
 	return nil
 }
 
+func (d *Driver) checkAMI() error {
+	// Check if image exists
+	images, err := d.getClient().DescribeImages(&ec2.DescribeImagesInput{
+		ImageIds: []*string{&d.AMI},
+	})
+	if err != nil {
+		return err
+	}
+	if len(images.Images) == 0 {
+		return fmt.Errorf("AMI %s not found on region %s", d.AMI, d.getRegionZone())
+	}
+
+	// Select the right device name, if not provided
+	if d.DeviceName == "" {
+		d.DeviceName = *images.Images[0].RootDeviceName
+	}
+
+	return nil
+}
+
 func (d *Driver) PreCreateCheck() error {
-	return d.checkPrereqs()
+	if err := d.checkSubnet(); err != nil {
+		return err
+	}
+
+	if err := d.checkAMI(); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (d *Driver) instanceIpAvailable() bool {
@@ -610,9 +636,7 @@ func (d *Driver) Base64UserData() (userdata string, err error) {
 }
 
 func (d *Driver) Create() error {
-	if err := d.checkPrereqs(); err != nil {
-		return err
-	}
+	// PreCreateCheck has already been called
 
 	if err := d.innerCreate(); err != nil {
 		// cleanup partially created resources
