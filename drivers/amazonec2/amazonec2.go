@@ -67,6 +67,7 @@ var (
 	otherKubePorts                       = []int64{10250, 10252}
 	kubeProxyPorts                       = []int64{10256, 10256}
 	nodePorts                            = []int64{30000, 32767}
+	calicoPort                           = 179
 	errorNoPrivateSSHKey                 = errors.New("using --amazonec2-keypair-name also requires --amazonec2-ssh-keypath")
 	errorMissingCredentials              = errors.New("amazonec2 driver requires AWS credentials configured with the --amazonec2-access-key and --amazonec2-secret-key options, environment variables, ~/.aws/credentials, or an instance role")
 	errorNoVPCIdFound                    = errors.New("amazonec2 driver requires either the --amazonec2-subnet-id or --amazonec2-vpc-id option or an AWS Account with a default vpc-id")
@@ -1409,6 +1410,20 @@ func (d *Driver) configureSecurityGroupPermissions(group *ec2.SecurityGroup) ([]
 				FromPort:   aws.Int64(int64(httpsPort)),
 				ToPort:     aws.Int64(int64(httpsPort)),
 				IpRanges:   []*ec2.IpRange{{CidrIp: aws.String(ipRange)}},
+			})
+		}
+
+		// calico additional port: https://docs.projectcalico.org/getting-started/openstack/requirements#network-requirements
+		if !hasPortsInbound[fmt.Sprintf("%d/tcp", calicoPort)] {
+			inboundPerms = append(inboundPerms, &ec2.IpPermission{
+				IpProtocol: aws.String("tcp"),
+				FromPort:   aws.Int64(int64(calicoPort)),
+				ToPort:     aws.Int64(int64(calicoPort)),
+				UserIdGroupPairs: []*ec2.UserIdGroupPair{
+					{
+						GroupId: group.GroupId,
+					},
+				},
 			})
 		}
 	}
