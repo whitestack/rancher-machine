@@ -529,3 +529,31 @@ func TestBase64UserDataIsCorrectWhenFileProvided(t *testing.T) {
 	assert.NoError(t, ud_err)
 	assert.Equal(t, contentBase64, userdata)
 }
+
+func TestDefaultAMI(t *testing.T) {
+	driver := NewCustomTestDriver(&fakeEC2WithLogin{})
+
+	err := driver.checkAMI()
+
+	assert.Equal(t, "/dev/sda1", driver.DeviceName)
+	assert.NoError(t, err)
+}
+
+func TestRootDeviceName(t *testing.T) {
+	driver := NewCustomTestDriver(&fakeEC2WithLogin{})
+	driver.AMI = "ami-0eeb1ef502d7b850d" // Fedora CoreOS image
+
+	err := driver.checkAMI()
+
+	assert.Equal(t, "/dev/xvda", driver.DeviceName)
+	assert.NoError(t, err)
+}
+
+func TestInvalidAMI(t *testing.T) {
+	driver := NewCustomTestDriver(&fakeEC2WithLogin{})
+	driver.AMI = "ami-000" // Invalid AMI
+
+	err := driver.checkAMI()
+
+	assert.Error(t, err)
+}

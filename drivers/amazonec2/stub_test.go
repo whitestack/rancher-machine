@@ -3,6 +3,7 @@ package amazonec2
 import (
 	"errors"
 
+	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/service/ec2"
 
@@ -95,6 +96,25 @@ func (f *fakeEC2WithLogin) DescribeAccountAttributes(input *ec2.DescribeAccountA
 			},
 		},
 	}, nil
+}
+
+func (f *fakeEC2WithLogin) DescribeImages(input *ec2.DescribeImagesInput) (*ec2.DescribeImagesOutput, error) {
+	if len(input.ImageIds) == 0 || input.ImageIds[0] == nil {
+		return nil, errors.New("bad input")
+	}
+	amiID := *input.ImageIds[0]
+	switch amiID {
+	case defaultAmiId, "ami-0c43b23f011ba5061": // two Ubuntu images
+		return &ec2.DescribeImagesOutput{Images: []*ec2.Image{
+			&ec2.Image{RootDeviceName: aws.String("/dev/sda1")},
+		}}, nil
+	case "ami-0eeb1ef502d7b850d": // Fedora CoreOS image
+		return &ec2.DescribeImagesOutput{Images: []*ec2.Image{
+			&ec2.Image{RootDeviceName: aws.String("/dev/xvda")},
+		}}, nil
+	default:
+		return nil, errors.New("no mock for input")
+	}
 }
 
 type fakeEC2SecurityGroupTestRecorder struct {
