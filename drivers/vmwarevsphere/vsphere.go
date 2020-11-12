@@ -181,31 +181,33 @@ func (d *Driver) GetIP() (string, error) {
 		return "", err
 	}
 
-	configuredMacIPs, err := vm.WaitForNetIP(d.getCtx(), false)
+	configuredMacIPs, err := vm.WaitForNetIP(d.getCtx(), true)
 	if err != nil {
 		return "", err
 	}
 
+	log.Debugf("[GetIP] configuredMacIPs: %+v", configuredMacIPs)
+
 	for _, ips := range configuredMacIPs {
-		if len(ips) >= 0 {
-			// Prefer IPv4 address, but fall back to first/IPv6
-			preferredIP := ips[0]
-			for _, ip := range ips {
-				// In addition to non IPv4 addresses, try to filter
-				// out link local addresses and the default address of
-				// the Docker0 bridge
-				netIP := net.ParseIP(ip)
-				if netIP.To4() != nil && netIP.IsGlobalUnicast() && !netIP.Equal(net.ParseIP(dockerBridgeIP)) {
-					preferredIP = ip
-					break
+		for _, ip := range ips {
+			// Try to filter out link local addresses and the default address of
+			// the Docker0 bridge
+			netIP := net.ParseIP(ip)
+			if netIP.To4() != nil && netIP.IsGlobalUnicast() && !netIP.Equal(net.ParseIP(dockerBridgeIP)) {
+				// The IP has to be set on the driver in order to test the IP using SSH
+				log.Debugf("[GetIP] Attempting SSH to IP %v", ip)
+				d.IPAddress = ip
+				_, err := drivers.RunSSHCommandFromDriver(d, "exit 0")
+				if err != nil {
+					// IP failed the SSH test so drop it so it's not saved on the driver if they all fail
+					d.IPAddress = ""
+					continue
 				}
+				return d.IPAddress, nil
 			}
-			d.IPAddress = preferredIP //cache
-			return preferredIP, nil
 		}
 	}
-
-	return "", errors.New("No IP despite waiting for one - check DHCP status")
+	return "", errors.New("No valid IP despite waiting for one - check DHCP status")
 }
 
 func (d *Driver) GetState() (state.State, error) {
