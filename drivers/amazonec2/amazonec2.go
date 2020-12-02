@@ -103,34 +103,33 @@ type Driver struct {
 	SecurityGroupName  string
 	SecurityGroupNames []string
 
-	SecurityGroupReadOnly    bool
-	OpenPorts                []string
-	Tags                     string
-	ReservationId            string
-	DeviceName               string
-	RootSize                 int64
-	VolumeType               string
-	IamInstanceProfile       string
-	VpcId                    string
-	SubnetId                 string
-	Zone                     string
-	keyPath                  string
-	RequestSpotInstance      bool
-	SpotPrice                string
-	BlockDurationMinutes     int64
-	PrivateIPOnly            bool
-	UsePrivateIP             bool
-	UseEbsOptimizedInstance  bool
-	Monitoring               bool
-	SSHPrivateKeyPath        string
-	RetryCount               int
-	Endpoint                 string
-	DisableSSL               bool
-	UserDataFile             string
-	EncryptEbsVolume         bool
-	spotInstanceRequestId    string
-	kmsKeyId                 *string
-	EncryptAdditionalVolumes bool
+	SecurityGroupReadOnly   bool
+	OpenPorts               []string
+	Tags                    string
+	ReservationId           string
+	DeviceName              string
+	RootSize                int64
+	VolumeType              string
+	IamInstanceProfile      string
+	VpcId                   string
+	SubnetId                string
+	Zone                    string
+	keyPath                 string
+	RequestSpotInstance     bool
+	SpotPrice               string
+	BlockDurationMinutes    int64
+	PrivateIPOnly           bool
+	UsePrivateIP            bool
+	UseEbsOptimizedInstance bool
+	Monitoring              bool
+	SSHPrivateKeyPath       string
+	RetryCount              int
+	Endpoint                string
+	DisableSSL              bool
+	UserDataFile            string
+	EncryptEbsVolume        bool
+	spotInstanceRequestId   string
+	kmsKeyId                *string
 
 	// Metadata Options
 	HttpEndpoint string
@@ -310,11 +309,6 @@ func (d *Driver) GetCreateFlags() []mcnflag.Flag {
 			Usage:  "Custom KMS key using the AWS Managed CMK",
 			EnvVar: "AWS_KMS_KEY",
 		},
-		mcnflag.BoolFlag{
-			Name:   "amazonec2-encrypt-additional-volumes",
-			Usage:  "Encrypt additional EBS volumes using the AWS Managed CMK",
-			EnvVar: "AWS_ENCRYPT_ADDITIONAL_VOLUMES",
-		},
 		mcnflag.StringFlag{
 			Name:   "amazonec2-http-endpoint",
 			Usage:  "Enables or disables the HTTP metadata endpoint on your instances",
@@ -423,7 +417,6 @@ func (d *Driver) SetConfigFromFlags(flags drivers.DriverOptions) error {
 	d.OpenPorts = flags.StringSlice("amazonec2-open-port")
 	d.UserDataFile = flags.String("amazonec2-userdata")
 	d.EncryptEbsVolume = flags.Bool("amazonec2-encrypt-ebs-volume")
-	d.EncryptAdditionalVolumes = flags.Bool("amazonec2-encrypt-additional-volumes")
 
 	httpEndpoint := flags.String("amazonec2-http-endpoint")
 	if httpEndpoint != "" {
@@ -673,16 +666,11 @@ func (d *Driver) innerCreate() error {
 		userdata = b64
 	}
 
-	bdm := &ec2.BlockDeviceMapping{
-		DeviceName: aws.String(d.DeviceName),
-		Ebs: &ec2.EbsBlockDevice{
-			VolumeSize:          aws.Int64(d.RootSize),
-			VolumeType:          aws.String(d.VolumeType),
-			DeleteOnTermination: aws.Bool(true),
-			Encrypted:           aws.Bool(d.EncryptEbsVolume),
-			KmsKeyId:            d.kmsKeyId,
-		},
+	bdmList, err := d.generateBDMList()
+	if err != nil {
+		return err
 	}
+
 	netSpecs := []*ec2.InstanceNetworkInterfaceSpecification{{
 		DeviceIndex:              aws.Int64(0), // eth0
 		Groups:                   makePointerSlice(d.securityGroupIds()),
@@ -694,17 +682,6 @@ func (d *Driver) innerCreate() error {
 	log.Debugf("launching instance in subnet %s", d.SubnetId)
 
 	var instance *ec2.Instance
-	bdmList := []*ec2.BlockDeviceMapping{bdm}
-	if d.EncryptEbsVolume && (d.kmsKeyId != nil) && d.EncryptAdditionalVolumes {
-		additionalBDM, err := d.encryptAdditionalVolumes()
-		if err != nil {
-			return err
-		}
-
-		if len(additionalBDM) > 0 {
-			bdmList = append(bdmList, additionalBDM...)
-		}
-	}
 
 	if d.RequestSpotInstance {
 		req := ec2.RequestSpotInstancesInput{
@@ -845,7 +822,7 @@ func (d *Driver) innerCreate() error {
 	)
 
 	log.Debug("Settings tags for instance")
-	err := d.configureTags(d.Tags)
+	err = d.configureTags(d.Tags)
 
 	if err != nil {
 		return fmt.Errorf("Unable to tag instance %s: %s", d.InstanceId, err)
@@ -1557,15 +1534,15 @@ func hasTagKey(tags []*ec2.Tag, key string) bool {
 	return false
 }
 
-func (d *Driver) encryptAdditionalVolumes() ([]*ec2.BlockDeviceMapping, error) {
-	var additionalBDM []*ec2.BlockDeviceMapping
+func (d *Driver) generateBDMList() ([]*ec2.BlockDeviceMapping, error) {
+	var bdmList []*ec2.BlockDeviceMapping
 
 	images, err := d.getClient().DescribeImages(&ec2.DescribeImagesInput{
 		ImageIds: []*string{
 			aws.String(d.AMI),
 		}})
 	if err != nil {
-		return additionalBDM, err
+		return bdmList, err
 	}
 
 	if len(images.Images) == 0 {
@@ -1573,20 +1550,19 @@ func (d *Driver) encryptAdditionalVolumes() ([]*ec2.BlockDeviceMapping, error) {
 	}
 
 	currentBDM := images.Images[0].BlockDeviceMappings
-	rootDisk := images.Images[0].RootDeviceName
-
-	// Going to skip root disk because that is already handled as part of standard provisioning
-	if len(currentBDM) == 0 {
-		return additionalBDM, nil
-	}
 
 	for _, bdm := range currentBDM {
-		if bdm.Ebs != nil && bdm.DeviceName != rootDisk {
+		if bdm.Ebs != nil {
+			if *bdm.DeviceName == d.DeviceName {
+				bdm.Ebs.VolumeSize = aws.Int64(d.RootSize)
+				bdm.Ebs.VolumeType = aws.String(d.VolumeType)
+			}
+			bdm.Ebs.DeleteOnTermination = aws.Bool(true)
 			bdm.Ebs.KmsKeyId = d.kmsKeyId
-			bdm.Ebs.Encrypted = aws.Bool(true)
-			additionalBDM = append(additionalBDM, bdm)
+			bdm.Ebs.Encrypted = aws.Bool(d.EncryptEbsVolume)
+			bdmList = append(bdmList, bdm)
 		}
 	}
 
-	return additionalBDM, nil
+	return bdmList, nil
 }
