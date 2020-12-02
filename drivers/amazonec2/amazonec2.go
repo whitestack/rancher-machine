@@ -130,7 +130,7 @@ type Driver struct {
 	EncryptEbsVolume        bool
 	spotInstanceRequestId   string
 	kmsKeyId                *string
-
+	bdmList                 []*ec2.BlockDeviceMapping
 	// Metadata Options
 	HttpEndpoint string
 	HttpTokens   string
@@ -570,6 +570,9 @@ func (d *Driver) checkAMI() error {
 		d.DeviceName = *images.Images[0].RootDeviceName
 	}
 
+	//store bdm list && update size and encryption settings
+	d.bdmList = images.Images[0].BlockDeviceMappings
+
 	return nil
 }
 
@@ -666,10 +669,7 @@ func (d *Driver) innerCreate() error {
 		userdata = b64
 	}
 
-	bdmList, err := d.generateBDMList()
-	if err != nil {
-		return err
-	}
+	bdmList := d.updateBDMList()
 
 	netSpecs := []*ec2.InstanceNetworkInterfaceSpecification{{
 		DeviceIndex:              aws.Int64(0), // eth0
@@ -822,7 +822,7 @@ func (d *Driver) innerCreate() error {
 	)
 
 	log.Debug("Settings tags for instance")
-	err = d.configureTags(d.Tags)
+	err := d.configureTags(d.Tags)
 
 	if err != nil {
 		return fmt.Errorf("Unable to tag instance %s: %s", d.InstanceId, err)
@@ -1534,24 +1534,10 @@ func hasTagKey(tags []*ec2.Tag, key string) bool {
 	return false
 }
 
-func (d *Driver) generateBDMList() ([]*ec2.BlockDeviceMapping, error) {
+func (d *Driver) updateBDMList() []*ec2.BlockDeviceMapping {
 	var bdmList []*ec2.BlockDeviceMapping
 
-	images, err := d.getClient().DescribeImages(&ec2.DescribeImagesInput{
-		ImageIds: []*string{
-			aws.String(d.AMI),
-		}})
-	if err != nil {
-		return bdmList, err
-	}
-
-	if len(images.Images) == 0 {
-		return nil, fmt.Errorf("AMI %s not found on region %s", d.AMI, d.getRegionZone())
-	}
-
-	currentBDM := images.Images[0].BlockDeviceMappings
-
-	for _, bdm := range currentBDM {
+	for _, bdm := range d.bdmList {
 		if bdm.Ebs != nil {
 			if *bdm.DeviceName == d.DeviceName {
 				bdm.Ebs.VolumeSize = aws.Int64(d.RootSize)
@@ -1564,5 +1550,5 @@ func (d *Driver) generateBDMList() ([]*ec2.BlockDeviceMapping, error) {
 		}
 	}
 
-	return bdmList, nil
+	return bdmList
 }
