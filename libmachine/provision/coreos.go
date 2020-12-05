@@ -10,6 +10,7 @@ import (
 	"github.com/rancher/machine/libmachine/engine"
 	"github.com/rancher/machine/libmachine/log"
 	"github.com/rancher/machine/libmachine/provision/pkgaction"
+	"github.com/rancher/machine/libmachine/provision/serviceaction"
 	"github.com/rancher/machine/libmachine/swarm"
 	"github.com/rancher/machine/libmachine/versioncmp"
 )
@@ -131,6 +132,12 @@ func (provisioner *CoreOSProvisioner) Provision(swarmOptions swarm.Options, auth
 	}
 
 	log.Debug("Configuring swarm")
-	err := configureSwarm(provisioner, swarmOptions, provisioner.AuthOptions)
+	if err := configureSwarm(provisioner, swarmOptions, provisioner.AuthOptions); err != nil {
+		return err
+	}
+
+	// enable in systemd
+	log.Debug("enabling docker in systemd")
+	err := provisioner.Service("docker", serviceaction.Enable)
 	return err
 }
