@@ -1,6 +1,8 @@
 # cloud.google.com/go v0.53.0
+## explicit
 cloud.google.com/go/compute/metadata
 # github.com/Azure/azure-sdk-for-go v41.2.0+incompatible
+## explicit
 github.com/Azure/azure-sdk-for-go/services/compute/mgmt/2019-12-01/compute
 github.com/Azure/azure-sdk-for-go/services/network/mgmt/2019-12-01/network
 github.com/Azure/azure-sdk-for-go/services/resources/mgmt/2019-05-01/resources
@@ -8,28 +10,35 @@ github.com/Azure/azure-sdk-for-go/services/resources/mgmt/2019-11-01/subscriptio
 github.com/Azure/azure-sdk-for-go/services/storage/mgmt/2019-06-01/storage
 github.com/Azure/azure-sdk-for-go/version
 # github.com/Azure/go-ansiterm v0.0.0-20170929234023-d6e3b3328b78
+## explicit
 github.com/Azure/go-ansiterm
 github.com/Azure/go-ansiterm/winterm
 # github.com/Azure/go-autorest/autorest v0.10.0
+## explicit
 github.com/Azure/go-autorest/autorest
 github.com/Azure/go-autorest/autorest/azure
 # github.com/Azure/go-autorest/autorest/adal v0.8.3
+## explicit
 github.com/Azure/go-autorest/autorest/adal
 # github.com/Azure/go-autorest/autorest/azure/auth v0.4.2
+## explicit
 github.com/Azure/go-autorest/autorest/azure/auth
 # github.com/Azure/go-autorest/autorest/azure/cli v0.3.1
 github.com/Azure/go-autorest/autorest/azure/cli
 # github.com/Azure/go-autorest/autorest/date v0.2.0
 github.com/Azure/go-autorest/autorest/date
 # github.com/Azure/go-autorest/autorest/to v0.3.0
+## explicit
 github.com/Azure/go-autorest/autorest/to
 # github.com/Azure/go-autorest/autorest/validation v0.2.0
+## explicit
 github.com/Azure/go-autorest/autorest/validation
 # github.com/Azure/go-autorest/logger v0.1.0
 github.com/Azure/go-autorest/logger
 # github.com/Azure/go-autorest/tracing v0.5.0
 github.com/Azure/go-autorest/tracing
 # github.com/aws/aws-sdk-go v1.33.14
+## explicit
 github.com/aws/aws-sdk-go/aws
 github.com/aws/aws-sdk-go/aws/awserr
 github.com/aws/aws-sdk-go/aws/awsutil
@@ -67,34 +76,47 @@ github.com/aws/aws-sdk-go/private/protocol/xml/xmlutil
 github.com/aws/aws-sdk-go/service/ec2
 github.com/aws/aws-sdk-go/service/sts
 github.com/aws/aws-sdk-go/service/sts/stsiface
+# github.com/bitly/go-simplejson v0.5.0
+## explicit
+# github.com/bmizerany/assert v0.0.0-20160611221934-b7ed37b82869
+## explicit
 # github.com/bugsnag/bugsnag-go v0.0.0-20151120182711-02e952891c52
+## explicit
 github.com/bugsnag/bugsnag-go
 github.com/bugsnag/bugsnag-go/errors
 # github.com/bugsnag/osext v0.0.0-20130617224835-0dd3f918b21b
+## explicit
 github.com/bugsnag/osext
 # github.com/bugsnag/panicwrap v0.0.0-20160118154447-aceac81c6e2f
+## explicit
 github.com/bugsnag/panicwrap
 # github.com/cenkalti/backoff v0.0.0-20141124221459-9831e1e25c87
+## explicit
 github.com/cenkalti/backoff
 # github.com/davecgh/go-spew v1.1.0
 github.com/davecgh/go-spew/spew
 # github.com/dgrijalva/jwt-go v3.2.0+incompatible
 github.com/dgrijalva/jwt-go
 # github.com/digitalocean/godo v0.0.0-20170317202744-d59ed2fe842b
+## explicit
 github.com/digitalocean/godo
 # github.com/dimchansky/utfbom v1.1.0
 github.com/dimchansky/utfbom
 # github.com/diskfs/go-diskfs v0.0.0-20191115120903-6cf046d472d7
+## explicit
 github.com/diskfs/go-diskfs/filesystem
 github.com/diskfs/go-diskfs/filesystem/iso9660
 github.com/diskfs/go-diskfs/partition/mbr
 github.com/diskfs/go-diskfs/util
 # github.com/docker/docker v0.0.0-20180212224933-bf1345d0b6d9 => github.com/moby/moby v1.4.2-0.20170731201646-1009e6a40b29
+## explicit
 github.com/docker/docker/pkg/term
 github.com/docker/docker/pkg/term/windows
 # github.com/docker/go-units v0.0.0-20151230175859-0bbddae09c5a
+## explicit
 github.com/docker/go-units
 # github.com/exoscale/egoscale v0.12.3
+## explicit
 github.com/exoscale/egoscale
 # github.com/golang/groupcache v0.0.0-20200121045136-8c9f03a8e57e
 github.com/golang/groupcache/lru
@@ -105,10 +127,12 @@ github.com/golang/protobuf/ptypes/any
 github.com/golang/protobuf/ptypes/duration
 github.com/golang/protobuf/ptypes/timestamp
 # github.com/google/go-querystring v0.0.0-20140804062624-30f7a39f4a21
+## explicit
 github.com/google/go-querystring/query
 # github.com/googleapis/gax-go/v2 v2.0.5
 github.com/googleapis/gax-go/v2
 # github.com/gophercloud/gophercloud v0.7.0
+## explicit
 github.com/gophercloud/gophercloud
 github.com/gophercloud/gophercloud/openstack
 github.com/gophercloud/gophercloud/openstack/blockstorage/v1/volumes
@@ -129,17 +153,28 @@ github.com/gophercloud/gophercloud/openstack/networking/v2/ports
 github.com/gophercloud/gophercloud/openstack/utils
 github.com/gophercloud/gophercloud/pagination
 # github.com/gophercloud/utils v0.0.0-20191129022341-463e26ffa30d
+## explicit
 github.com/gophercloud/utils/env
 github.com/gophercloud/utils/openstack/clientconfig
+# github.com/gorilla/mux v1.7.3
+## explicit
 # github.com/jmespath/go-jmespath v0.3.0
 github.com/jmespath/go-jmespath
+# github.com/juju/loggo v0.0.0-20190526231331-6e530bcce5d8
+## explicit
 # github.com/mitchellh/go-homedir v1.1.0
 github.com/mitchellh/go-homedir
 # github.com/mitchellh/mapstructure v0.0.0-20140721150620-740c764bc614
+## explicit
 github.com/mitchellh/mapstructure
+# github.com/onsi/ginkgo v1.9.0
+## explicit
+# github.com/onsi/gomega v1.6.0
+## explicit
 # github.com/pmezard/go-difflib v1.0.0
 github.com/pmezard/go-difflib/difflib
 # github.com/rackspace/gophercloud v0.0.0-20150408191457-ce0f487f6747
+## explicit
 github.com/rackspace/gophercloud
 github.com/rackspace/gophercloud/openstack
 github.com/rackspace/gophercloud/openstack/identity/v2/tenants
@@ -152,26 +187,34 @@ github.com/rackspace/gophercloud/rackspace/identity/v2/tokens
 github.com/rackspace/gophercloud/testhelper
 github.com/rackspace/gophercloud/testhelper/client
 # github.com/samalba/dockerclient v0.0.0-20151231000007-f661dd4754aa
+## explicit
 github.com/samalba/dockerclient
 # github.com/satori/go.uuid v1.2.0
 github.com/satori/go.uuid
 # github.com/sirupsen/logrus v1.0.4
+## explicit
 github.com/sirupsen/logrus
 # github.com/skarademir/naturalsort v0.0.0-20150715044055-69a5d87bef62
+## explicit
 github.com/skarademir/naturalsort
 # github.com/stretchr/objx v0.1.0
 github.com/stretchr/objx
 # github.com/stretchr/testify v1.5.1
+## explicit
 github.com/stretchr/testify/assert
 github.com/stretchr/testify/mock
 # github.com/tent/http-link-go v0.0.0-20130702225549-ac974c61c2f9
+## explicit
 github.com/tent/http-link-go
 # github.com/urfave/cli v1.11.1-0.20151120215642-0302d3914d2a
+## explicit
 github.com/urfave/cli
 # github.com/vmware/govcloudair v0.0.2
+## explicit
 github.com/vmware/govcloudair
 github.com/vmware/govcloudair/types/v56
 # github.com/vmware/govmomi v0.23.2-0.20201015235820-81318771d0e0
+## explicit
 github.com/vmware/govmomi
 github.com/vmware/govmomi/find
 github.com/vmware/govmomi/guest
@@ -215,6 +258,7 @@ go.opencensus.io/trace/internal
 go.opencensus.io/trace/propagation
 go.opencensus.io/trace/tracestate
 # golang.org/x/crypto v0.0.0-20200406173513-056763e48d71
+## explicit
 golang.org/x/crypto/blowfish
 golang.org/x/crypto/chacha20
 golang.org/x/crypto/curve25519
@@ -228,6 +272,7 @@ golang.org/x/crypto/ssh
 golang.org/x/crypto/ssh/internal/bcrypt_pbkdf
 golang.org/x/crypto/ssh/terminal
 # golang.org/x/net v0.0.0-20200202094626-16171245cfb2
+## explicit
 golang.org/x/net/context
 golang.org/x/net/context/ctxhttp
 golang.org/x/net/http/httpguts
@@ -237,12 +282,14 @@ golang.org/x/net/idna
 golang.org/x/net/internal/timeseries
 golang.org/x/net/trace
 # golang.org/x/oauth2 v0.0.0-20200107190931-bf48bf16ab8d
+## explicit
 golang.org/x/oauth2
 golang.org/x/oauth2/google
 golang.org/x/oauth2/internal
 golang.org/x/oauth2/jws
 golang.org/x/oauth2/jwt
 # golang.org/x/sys v0.0.0-20200212091648-12a6c2dcc1e4
+## explicit
 golang.org/x/sys/cpu
 golang.org/x/sys/unix
 golang.org/x/sys/windows
@@ -257,6 +304,7 @@ golang.org/x/text/transform
 golang.org/x/text/unicode/bidi
 golang.org/x/text/unicode/norm
 # google.golang.org/api v0.17.0
+## explicit
 google.golang.org/api/compute/v1
 google.golang.org/api/googleapi
 google.golang.org/api/googleapi/transport
@@ -316,7 +364,15 @@ google.golang.org/grpc/serviceconfig
 google.golang.org/grpc/stats
 google.golang.org/grpc/status
 google.golang.org/grpc/tap
+# gopkg.in/airbrake/gobrake.v2 v2.0.9
+## explicit
 # gopkg.in/djherbis/times.v1 v1.2.0
 gopkg.in/djherbis/times.v1
+# gopkg.in/gemnasium/logrus-airbrake-hook.v2 v2.1.2
+## explicit
 # gopkg.in/yaml.v2 v2.2.7
+## explicit
 gopkg.in/yaml.v2
+# launchpad.net/gocheck v0.0.0-20140225173054-000000000087
+## explicit
+# github.com/docker/docker => github.com/moby/moby v1.4.2-0.20170731201646-1009e6a40b29
