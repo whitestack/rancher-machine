@@ -187,23 +187,33 @@ func (provisioner *SUSEProvisioner) configureFirewall() error {
 	tcpPorts := "22 80 443 2376 2379 2380 6443 9099 9796 10250 10254 30000:32767"
 	udpPorts := "8472 30000:32767"
 	var cmds []string
-	if _, installed := provisioner.SSHCommand("rpm -q firewalld"); installed == nil {
-		tcpPorts := strings.ReplaceAll(tcpPorts, ":", "-")
-		udpPorts := strings.ReplaceAll(udpPorts, ":", "-")
-		for _, port := range strings.Split(tcpPorts, " ") {
-			cmds = append(cmds, fmt.Sprintf("sudo firewall-cmd --permanent --add-port=%s/tcp", port))
-		}
-		for _, port := range strings.Split(udpPorts, " ") {
-			cmds = append(cmds, fmt.Sprintf("sudo firewall-cmd --permanent --add-port=%s/udp", port))
-		}
-		cmds = append(cmds, "sudo firewall-cmd --reload")
-	} else {
+	// SLES15 has dropped SuSEfirewall2: https://www.suse.com/releasenotes/x86_64/SUSE-SLES/15/#fate-320794
+	// Change to logic to allow handling the same //
+	if _, installed := provisioner.SSHCommand("rpm -q SuSEfirewall2"); installed == nil {
 		cmds = []string{
 			fmt.Sprintf(`sudo sed -i 's/FW_SERVICES_EXT_TCP=".*"/FW_SERVICES_EXT_TCP="%s"/' /etc/sysconfig/SuSEfirewall2`, tcpPorts),
 			fmt.Sprintf(`sudo sed -i 's/FW_SERVICES_EXT_UDP=".*"/FW_SERVICES_EXT_UDP="%s"/' /etc/sysconfig/SuSEfirewall2`, udpPorts),
 			"sudo /sbin/SuSEfirewall2",
 		}
 	}
+
+	// firewall is an optional package unlike SuSEfirewall2
+	if _, installed := provisioner.SSHCommand("rpm -q firewalld"); installed == nil {
+		// check if firewalld is running //
+		if _, running := provisioner.SSHCommand("sudo firewall-cmd --stat"); running == nil {
+			tcpPorts := strings.ReplaceAll(tcpPorts, ":", "-")
+			udpPorts := strings.ReplaceAll(udpPorts, ":", "-")
+			for _, port := range strings.Split(tcpPorts, " ") {
+				cmds = append(cmds, fmt.Sprintf("sudo firewall-cmd --permanent --add-port=%s/tcp", port))
+			}
+			for _, port := range strings.Split(udpPorts, " ") {
+				cmds = append(cmds, fmt.Sprintf("sudo firewall-cmd --permanent --add-port=%s/udp", port))
+			}
+			cmds = append(cmds, "sudo firewall-cmd --reload")
+		}
+
+	}
+
 	for _, cmd := range cmds {
 		if _, err := provisioner.SSHCommand(cmd); err != nil {
 			return err
