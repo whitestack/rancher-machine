@@ -3,10 +3,11 @@ package provision
 import (
 	"bytes"
 	"fmt"
-	"github.com/rancher/machine/libmachine/mcnutils"
-	"github.com/rancher/machine/libmachine/provision/serviceaction"
 	"strings"
 	"text/template"
+
+	"github.com/rancher/machine/libmachine/mcnutils"
+	"github.com/rancher/machine/libmachine/provision/serviceaction"
 
 	"github.com/rancher/machine/libmachine/auth"
 	"github.com/rancher/machine/libmachine/drivers"
@@ -29,7 +30,7 @@ func NewPhotonOSProvisioner(d drivers.Driver) Provisioner {
 	}
 }
 
-// PhotonOSProvisioner is a provisioner based on the CoreOS provisioner
+// PhotonOSProvisioner is a provisioner based on the SystemdProvisioner provisioner
 type PhotonOSProvisioner struct {
 	SystemdProvisioner
 }
