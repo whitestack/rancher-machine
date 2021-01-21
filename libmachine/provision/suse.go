@@ -201,6 +201,10 @@ func (provisioner *SUSEProvisioner) configureFirewall() error {
 	if _, installed := provisioner.SSHCommand("rpm -q firewalld"); installed == nil {
 		// check if firewalld is running //
 		if _, running := provisioner.SSHCommand("sudo firewall-cmd --stat"); running == nil {
+			// edge case where someone may have installed both, we default to the running firewalld
+			if len(cmds) != 0 {
+				cmds = nil
+			}
 			tcpPorts := strings.ReplaceAll(tcpPorts, ":", "-")
 			udpPorts := strings.ReplaceAll(udpPorts, ":", "-")
 			for _, port := range strings.Split(tcpPorts, " ") {
