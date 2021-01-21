@@ -130,7 +130,7 @@ type Driver struct {
 	EncryptEbsVolume        bool
 	spotInstanceRequestId   string
 	kmsKeyId                *string
-
+	bdmList                 []*ec2.BlockDeviceMapping
 	// Metadata Options
 	HttpEndpoint string
 	HttpTokens   string
@@ -570,6 +570,9 @@ func (d *Driver) checkAMI() error {
 		d.DeviceName = *images.Images[0].RootDeviceName
 	}
 
+	//store bdm list && update size and encryption settings
+	d.bdmList = images.Images[0].BlockDeviceMappings
+
 	return nil
 }
 
@@ -666,16 +669,8 @@ func (d *Driver) innerCreate() error {
 		userdata = b64
 	}
 
-	bdm := &ec2.BlockDeviceMapping{
-		DeviceName: aws.String(d.DeviceName),
-		Ebs: &ec2.EbsBlockDevice{
-			VolumeSize:          aws.Int64(d.RootSize),
-			VolumeType:          aws.String(d.VolumeType),
-			DeleteOnTermination: aws.Bool(true),
-			Encrypted:           aws.Bool(d.EncryptEbsVolume),
-			KmsKeyId:            d.kmsKeyId,
-		},
-	}
+	bdmList := d.updateBDMList()
+
 	netSpecs := []*ec2.InstanceNetworkInterfaceSpecification{{
 		DeviceIndex:              aws.Int64(0), // eth0
 		Groups:                   makePointerSlice(d.securityGroupIds()),
@@ -703,7 +698,7 @@ func (d *Driver) innerCreate() error {
 					Name: &d.IamInstanceProfile,
 				},
 				EbsOptimized:        &d.UseEbsOptimizedInstance,
-				BlockDeviceMappings: []*ec2.BlockDeviceMapping{bdm},
+				BlockDeviceMappings: bdmList,
 				UserData:            &userdata,
 			},
 			InstanceCount: aws.Int64(1),
@@ -786,7 +781,7 @@ func (d *Driver) innerCreate() error {
 				Name: &d.IamInstanceProfile,
 			},
 			EbsOptimized:        &d.UseEbsOptimizedInstance,
-			BlockDeviceMappings: []*ec2.BlockDeviceMapping{bdm},
+			BlockDeviceMappings: bdmList,
 			UserData:            &userdata,
 		})
 
@@ -1537,4 +1532,23 @@ func hasTagKey(tags []*ec2.Tag, key string) bool {
 		}
 	}
 	return false
+}
+
+func (d *Driver) updateBDMList() []*ec2.BlockDeviceMapping {
+	var bdmList []*ec2.BlockDeviceMapping
+
+	for _, bdm := range d.bdmList {
+		if bdm.Ebs != nil {
+			if *bdm.DeviceName == d.DeviceName {
+				bdm.Ebs.VolumeSize = aws.Int64(d.RootSize)
+				bdm.Ebs.VolumeType = aws.String(d.VolumeType)
+			}
+			bdm.Ebs.DeleteOnTermination = aws.Bool(true)
+			bdm.Ebs.KmsKeyId = d.kmsKeyId
+			bdm.Ebs.Encrypted = aws.Bool(d.EncryptEbsVolume)
+			bdmList = append(bdmList, bdm)
+		}
+	}
+
+	return bdmList
 }
