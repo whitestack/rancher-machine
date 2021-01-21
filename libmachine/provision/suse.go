@@ -142,7 +142,6 @@ func (provisioner *SUSEProvisioner) Provision(swarmOptions swarm.Options, authOp
 		}
 	}
 
-	log.Debug("Installing docker")
 	if err := installDockerGeneric(provisioner, provisioner.EngineOptions.InstallURL); err != nil {
 		return err
 	}

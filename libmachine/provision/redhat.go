@@ -101,19 +101,6 @@ func (provisioner *RedHatProvisioner) Package(name string, action pkgaction.Pack
 	return nil
 }
 
-func installDocker(provisioner *RedHatProvisioner) error {
-	if err := installDockerGeneric(provisioner, provisioner.EngineOptions.InstallURL); err != nil {
-		return err
-	}
-
-	if err := provisioner.Service("docker", serviceaction.Restart); err != nil {
-		return err
-	}
-
-	err := provisioner.Service("docker", serviceaction.Enable)
-	return err
-}
-
 func (provisioner *RedHatProvisioner) dockerDaemonResponding() bool {
 	log.Debug("checking docker daemon")
 
@@ -151,14 +138,15 @@ func (provisioner *RedHatProvisioner) Provision(swarmOptions swarm.Options, auth
 		}
 	}
 
-	// update OS -- this is needed for libdevicemapper and the docker install
-	if _, err := provisioner.SSHCommand("sudo -E yum -y update -x docker-*"); err != nil {
+	if err := installDockerGeneric(provisioner, provisioner.EngineOptions.InstallURL); err != nil {
 		return err
-	}
-
-	// install docker
-	if err := installDocker(provisioner); err != nil {
-		return err
+	} else if err == nil {
+		if err := provisioner.Service("docker", serviceaction.Restart); err != nil {
+			return err
+		}
+		if err := provisioner.Service("docker", serviceaction.Enable); err != nil {
+			return err
+		}
 	}
 
 	if err := mcnutils.WaitFor(provisioner.dockerDaemonResponding); err != nil {

@@ -120,8 +120,7 @@ func (provisioner *UbuntuSystemdProvisioner) Provision(swarmOptions swarm.Option
 		}
 	}
 
-	log.Info("Installing Docker...")
-	if err := installDockerGeneric(provisioner, engineOptions.InstallURL); err != nil {
+	if err := installDockerGeneric(provisioner, provisioner.EngineOptions.InstallURL); err != nil {
 		return err
 	}
 
