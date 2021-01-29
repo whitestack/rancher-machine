@@ -311,8 +311,11 @@ func (d *Driver) GetState() (state.State, error) {
 
 	// All we care about is whether the disk exists, so we just check disk for a nil value.
 	// There will be no error if disk is not nil.
-	instance, _ := c.instance()
+	instance, err := c.instance()
 	if instance == nil {
+		if err != nil && strings.Contains(err.Error(), "not found") {
+			return state.NotFound, nil
+		}
 		disk, _ := c.disk()
 		if disk == nil {
 			return state.None, nil

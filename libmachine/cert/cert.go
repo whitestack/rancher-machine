@@ -224,6 +224,9 @@ func (xcg *X509CertGenerator) GenerateCert(opts *Options) error {
 
 // ReadTLSConfig reads the tls config for a machine.
 func (xcg *X509CertGenerator) ReadTLSConfig(addr string, authOptions *auth.Options) (*tls.Config, error) {
+	if authOptions == nil {
+		return nil, errors.New("no authConfig for docker endpoint")
+	}
 	caCertPath := authOptions.CaCertPath
 	clientCertPath := authOptions.ClientCertPath
 	clientKeyPath := authOptions.ClientKeyPath

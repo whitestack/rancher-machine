@@ -2,10 +2,18 @@ package commands
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/rancher/machine/libmachine"
 	"github.com/rancher/machine/libmachine/log"
+	"github.com/rancher/machine/libmachine/state"
 )
+
+type notFoundError string
+
+func (nf notFoundError) Error() string {
+	return string(nf)
+}
 
 func cmdStatus(c CommandLine, api libmachine.API) error {
 	if len(c.Args()) > 1 {
@@ -24,10 +32,15 @@ func cmdStatus(c CommandLine, api libmachine.API) error {
 
 	currentState, err := host.Driver.GetState()
 	if err != nil {
-		return fmt.Errorf("error getting state for host %s: %s", host.Name, err)
+		if !strings.Contains(strings.ToLower(err.Error()), "not found") {
+			return fmt.Errorf("error getting state for host %s: %s", host.Name, err)
+		}
+
+		currentState = state.NotFound
+		err = notFoundError(fmt.Sprintf("%v not found", host.Name))
 	}
 
 	log.Info(currentState)
 
-	return nil
+	return err
 }

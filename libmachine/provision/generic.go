@@ -136,3 +136,7 @@ DOCKER_OPTS='
 func (provisioner *GenericProvisioner) GetDriver() drivers.Driver {
 	return provisioner.Driver
 }
+
+func (provisioner *GenericProvisioner) GetPackages() []string {
+	return provisioner.Packages
+}

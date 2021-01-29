@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net"
+	"net/http"
 	"os"
 	"path"
 	"strings"
@@ -335,10 +336,14 @@ func (d *Driver) GetURL() (string, error) {
 }
 
 func (d *Driver) GetState() (state.State, error) {
-	droplet, _, err := d.getClient().Droplets.Get(context.TODO(), d.DropletID)
+	droplet, resp, err := d.getClient().Droplets.Get(context.TODO(), d.DropletID)
 	if err != nil {
-		return state.Error, err
+		if resp == nil || resp.StatusCode != http.StatusNotFound {
+			return state.Error, err
+		}
+		return state.None, fmt.Errorf("machine %v not found", d.MachineName)
 	}
+
 	switch droplet.Status {
 	case "new":
 		return state.Starting, nil

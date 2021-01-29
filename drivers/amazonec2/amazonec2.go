@@ -890,7 +890,7 @@ func (d *Driver) GetState() (state.State, error) {
 	case ec2.InstanceStateNameStopped:
 		return state.Stopped, nil
 	case ec2.InstanceStateNameTerminated:
-		return state.Error, nil
+		return state.Error, fmt.Errorf("valid machine %v not found", d.MachineName)
 	default:
 		log.Warnf("unrecognized instance state: %v", *inst.State.Name)
 		return state.Error, nil
@@ -962,7 +962,7 @@ func (d *Driver) Remove() error {
 	}
 
 	if !d.ExistingKey {
-		if err := d.deleteKeyPair(); err != nil {
+		if err := d.deleteKeyPair(); err != nil && !strings.Contains(err.Error(), "not found") {
 			multierr.Errs = append(multierr.Errs, err)
 		}
 	}
@@ -989,6 +989,9 @@ func (d *Driver) getInstance() (*ec2.Instance, error) {
 	})
 	if err != nil {
 		return nil, err
+	}
+	if len(instances.Reservations) == 0 || len(instances.Reservations[0].Instances) == 0 {
+		return nil, fmt.Errorf("instance %v not found", d.InstanceId)
 	}
 	return instances.Reservations[0].Instances[0], nil
 }

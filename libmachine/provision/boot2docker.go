@@ -266,3 +266,7 @@ func (provisioner *Boot2DockerProvisioner) SSHCommand(args string) (string, erro
 func (provisioner *Boot2DockerProvisioner) GetDriver() drivers.Driver {
 	return provisioner.Driver
 }
+
+func (provisioner *Boot2DockerProvisioner) GetPackages() []string {
+	return nil
+}

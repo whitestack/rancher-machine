@@ -2,7 +2,6 @@ package commands
 
 import (
 	"fmt"
-
 	"io"
 	"os"
 
@@ -29,12 +28,16 @@ func printVersion(c CommandLine, api libmachine.API, out io.Writer) error {
 		return err
 	}
 
-	version, err := mcndockerclient.DockerVersion(host)
-	if err != nil {
-		return err
-	}
+	if host.HostOptions.AuthOptions != nil {
+		version, err := mcndockerclient.DockerVersion(host)
+		if err != nil {
+			return err
+		}
 
-	fmt.Fprintln(out, version)
+		fmt.Fprintln(out, version)
+	} else {
+		fmt.Fprintln(out, "Docker was not installed on machine")
+	}
 
 	return nil
 }
