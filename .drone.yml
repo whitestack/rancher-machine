@@ -8,16 +8,18 @@ platform:
 steps:
   - name: build
     pull: default
-    image: rancher/dapper:v0.4.1
+    image: rancher/dapper:v0.5.4
     commands:
       - dapper ci
+    privileged: true
     volumes:
-      - name: docker
-        path: /var/run/docker.sock
+    - name: docker
+      path: /var/run/docker.sock
     when:
       event:
       - tag
       - pull_request
+
   - name: github_binary_release
     image: plugins/github-release
     settings:
@@ -33,11 +35,38 @@ steps:
       - refs/tags/*
       event:
       - tag
+
+  - name: stage-binaries
+    image: rancher/dapper:v0.5.4
+    commands:
+      - "cp -r ./bin/* ./package/"
+    when:
+      event:
+        - tag
+
+  - name: docker-publish
+    image: plugins/docker
+    settings:
+      purge: false
+      context: package/
+      dockerfile: package/Dockerfile
+      password:
+        from_secret: docker_password
+      repo: rancher/machine
+      tag: "${DRONE_TAG}-amd64"
+      username:
+        from_secret: docker_username
+    when:
+      event:
+        - tag
+
 volumes:
   - name: docker
     host:
       path: /var/run/docker.sock
+
 ---
+
 kind: pipeline
 name: arm64
 
@@ -48,9 +77,10 @@ platform:
 steps:
   - name: build
     pull: default
-    image: rancher/dapper:v0.4.1
+    image: rancher/dapper:v0.5.4
     commands:
       - dapper ci
+    privileged: true
     volumes:
       - name: docker
         path: /var/run/docker.sock
@@ -58,6 +88,7 @@ steps:
       event:
         - tag
         - pull_request
+
   - name: github_binary_release
     image: plugins/github-release
     settings:
@@ -73,7 +104,67 @@ steps:
       - refs/tags/*
       event:
       - tag
+
+  - name: stage-binaries
+    image: rancher/dapper:v0.5.4
+    commands:
+      - "cp -r ./bin/* ./package/"
+    when:
+      event:
+        - tag
+
+  - name: docker-publish
+    image: plugins/docker
+    settings:
+      purge: false
+      context: package/
+      dockerfile: package/Dockerfile
+      password:
+        from_secret: docker_password
+      repo: rancher/machine
+      tag: "${DRONE_TAG}-arm64"
+      username:
+        from_secret: docker_username
+    when:
+      event:
+        - tag
+
 volumes:
   - name: docker
     host:
       path: /var/run/docker.sock
+
+---
+
+kind: pipeline
+name: manifest
+
+steps:
+  - name: push-manifest
+    image: plugins/manifest:1.0.2
+    settings:
+      username:
+        from_secret: docker_username
+      password:
+        from_secret: docker_password
+      platforms:
+        - linux/amd64
+        - linux/arm64
+      target: "rancher/machine:${DRONE_TAG}"
+      template: "rancher/machine:${DRONE_TAG}-ARCH"
+    when:
+      event:
+      - tag
+
+volumes:
+  - name: docker
+    host:
+      path: /var/run/docker.sock
+
+trigger:
+  event:
+    - tag
+
+depends_on:
+  - amd64
+  - arm64

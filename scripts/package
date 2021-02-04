@@ -2,6 +2,19 @@
 
 set -e
 
+source $(dirname $0)/version
+
+if [ -z "$ARCH" ]; then
+    ARCH=amd64
+fi
+
+SUFFIX=""
+[ "${ARCH}" != "amd64" ] && SUFFIX="_${ARCH}"
+
+TAG=${TAG:-${VERSION}${SUFFIX}}
+REPO=${REPO:-rancher}
+IMAGE=${REPO}/machine:${TAG}
+
 cd $(dirname $0)/..
 BASEDIR=$(pwd)
 mkdir -p $BASEDIR/dist/artifacts
@@ -9,3 +22,7 @@ mkdir -p $BASEDIR/dist/artifacts
 cd $BASEDIR/bin
 tar -cvzf $BASEDIR/dist/artifacts/rancher-machine-${ARCH}.tar.gz rancher-machine
 cd $BASEDIR
+
+cp ./bin/rancher-machine ./package
+
+docker build -f package/Dockerfile -t ${IMAGE} package
