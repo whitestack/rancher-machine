@@ -3,6 +3,7 @@ package google
 import (
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"net"
 	"strings"
 
@@ -32,6 +33,7 @@ type Driver struct {
 	Tags              string
 	UseExisting       bool
 	OpenPorts         []string
+	Userdata          string
 }
 
 const (
@@ -144,6 +146,12 @@ func (d *Driver) GetCreateFlags() []mcnflag.Flag {
 			Name:  "google-open-port",
 			Usage: "Make the specified port number accessible from the Internet, e.g, 8080/tcp",
 		},
+		mcnflag.StringFlag{
+			Name:   "google-userdata",
+			Usage:  "A user-data file to be passed to cloud-init",
+			EnvVar: "GOOGLE_USERDATA",
+			Value:  "",
+		},
 	}
 }
 
@@ -211,6 +219,7 @@ func (d *Driver) SetConfigFromFlags(flags drivers.DriverOptions) error {
 	}
 	d.SSHUser = flags.String("google-username")
 	d.SSHPort = 22
+	d.Userdata = flags.String("google-userdata")
 	d.SetSwarmConfigFromFlags(flags)
 
 	return nil
@@ -245,6 +254,13 @@ func (d *Driver) PreCreateCheck() error {
 			return fmt.Errorf("instance %q already exists in zone %q", d.MachineName, d.Zone)
 		}
 	}
+
+	// Read the userdata file
+	file, err := ioutil.ReadFile(d.Userdata)
+	if err != nil {
+		return fmt.Errorf("cannot read userdata file %v: %v", d.Userdata, err)
+	}
+	d.Userdata = string(file)
 
 	return nil
 }

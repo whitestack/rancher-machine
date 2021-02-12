@@ -1,6 +1,7 @@
 package google
 
 import (
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -11,12 +12,9 @@ import (
 
 	"github.com/rancher/machine/drivers/driverutil"
 	"github.com/rancher/machine/libmachine/log"
-	raw "google.golang.org/api/compute/v1"
-
-	"errors"
-
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
+	raw "google.golang.org/api/compute/v1"
 	"google.golang.org/api/googleapi"
 )
 
@@ -324,7 +322,7 @@ func (c *ComputeUtil) createInstance(d *Driver) error {
 		return err
 	}
 
-	return c.uploadSSHKey(instance, d.GetSSHKeyPath())
+	return c.uploadSSHKeyAndUserdata(instance, d.GetSSHKeyPath(), d.Userdata)
 }
 
 // configureInstance configures an existing instance for use with Docker Machine.
@@ -340,7 +338,7 @@ func (c *ComputeUtil) configureInstance(d *Driver) error {
 		return err
 	}
 
-	return c.uploadSSHKey(instance, d.GetSSHKeyPath())
+	return c.uploadSSHKeyAndUserdata(instance, d.GetSSHKeyPath(), d.Userdata)
 }
 
 // addFirewallTag adds a tag to the instance to match the firewall rule.
@@ -364,9 +362,9 @@ func (c *ComputeUtil) addFirewallTag(instance *raw.Instance) error {
 	return c.waitForRegionalOp(op.Name)
 }
 
-// uploadSSHKey updates the instance metadata with the given ssh key.
-func (c *ComputeUtil) uploadSSHKey(instance *raw.Instance, sshKeyPath string) error {
-	log.Infof("Uploading SSH Key")
+// uploadSSHKeyUserdata updates the instance metadata with the given ssh key and userdata.
+func (c *ComputeUtil) uploadSSHKeyAndUserdata(instance *raw.Instance, sshKeyPath, userdata string) error {
+	log.Infof("Uploading SSH Key and userdata")
 
 	sshKey, err := ioutil.ReadFile(sshKeyPath + ".pub")
 	if err != nil {
@@ -374,8 +372,7 @@ func (c *ComputeUtil) uploadSSHKey(instance *raw.Instance, sshKeyPath string) er
 	}
 
 	metaDataValue := fmt.Sprintf("%s:%s %s\n", c.userName, strings.TrimSpace(string(sshKey)), c.userName)
-
-	op, err := c.service.Instances.SetMetadata(c.project, c.zone, c.instanceName, &raw.Metadata{
+	metadata := &raw.Metadata{
 		Fingerprint: instance.Metadata.Fingerprint,
 		Items: []*raw.MetadataItems{
 			{
@@ -383,7 +380,16 @@ func (c *ComputeUtil) uploadSSHKey(instance *raw.Instance, sshKeyPath string) er
 				Value: &metaDataValue,
 			},
 		},
-	}).Do()
+	}
+
+	if userdata != "" {
+		metadata.Items = append(instance.Metadata.Items, &raw.MetadataItems{
+			Key:   "user-data",
+			Value: &userdata,
+		})
+	}
+
+	op, err := c.service.Instances.SetMetadata(c.project, c.zone, c.instanceName, metadata).Do()
 
 	return c.waitForRegionalOp(op.Name)
 }
