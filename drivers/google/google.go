@@ -17,6 +17,7 @@ import (
 // Driver is a struct compatible with the docker.hosts.drivers.Driver interface.
 type Driver struct {
 	*drivers.BaseDriver
+	Auth              string
 	Zone              string
 	MachineType       string
 	MachineImage      string
@@ -75,6 +76,11 @@ func (d *Driver) GetCreateFlags() []mcnflag.Flag {
 			Usage:  "GCE User Name",
 			Value:  defaultUser,
 			EnvVar: "GOOGLE_USERNAME",
+		},
+		mcnflag.StringFlag{
+			Name:   "google-auth-encoded-json",
+			Usage:  "Base64 encoded GCE auth json",
+			EnvVar: "GOOGLE_APPLICATION_CREDENTIALS_ENCODED_JSON",
 		},
 		mcnflag.StringFlag{
 			Name:   "google-project",
@@ -198,6 +204,7 @@ func (d *Driver) SetConfigFromFlags(flags drivers.DriverOptions) error {
 	if d.Project == "" {
 		return errors.New("no Google Cloud Project name specified (--google-project)")
 	}
+	d.Auth = flags.String("google-auth-encoded-json")
 
 	d.Zone = flags.String("google-zone")
 	d.UseExisting = flags.Bool("google-use-existing")

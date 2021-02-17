@@ -1,6 +1,8 @@
 package google
 
 import (
+	"context"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"io/ioutil"
@@ -16,6 +18,7 @@ import (
 	"golang.org/x/oauth2/google"
 	raw "google.golang.org/api/compute/v1"
 	"google.golang.org/api/googleapi"
+	"google.golang.org/api/option"
 )
 
 // ComputeUtil is used to wrap the raw GCE API code and store common parameters.
@@ -48,12 +51,29 @@ const (
 
 // NewComputeUtil creates and initializes a ComputeUtil.
 func newComputeUtil(driver *Driver) (*ComputeUtil, error) {
-	client, err := google.DefaultClient(oauth2.NoContext, raw.ComputeScope)
-	if err != nil {
-		return nil, err
+	ctx := context.Background()
+	var client *http.Client
+
+	if driver.Auth != "" {
+		jsonCreds, err := base64.StdEncoding.DecodeString(driver.Auth)
+		if err != nil {
+			return nil, err
+		}
+
+		creds, err := google.CredentialsFromJSON(ctx, jsonCreds, raw.ComputeScope)
+		if err != nil {
+			return nil, err
+		}
+		client = oauth2.NewClient(ctx, creds.TokenSource)
+	} else {
+		var err error
+		client, err = google.DefaultClient(ctx, raw.ComputeScope)
+		if err != nil {
+			return nil, err
+		}
 	}
 
-	service, err := raw.New(client)
+	service, err := raw.NewService(ctx, option.WithHTTPClient(client))
 	if err != nil {
 		return nil, err
 	}
