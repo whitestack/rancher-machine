@@ -181,37 +181,32 @@ func (d *Driver) GetIP() (string, error) {
 		return "", err
 	}
 
-	for i := 0; i < 5; i++ {
-		configuredMacIPs, err := vm.WaitForNetIP(d.getCtx(), true)
-		if err != nil {
-			return "", err
-		}
-
-		log.Debugf("[GetIP] configuredMacIPs: %+v", configuredMacIPs)
-
-		for _, ips := range configuredMacIPs {
-			for _, ip := range ips {
-				// Try to filter out link local addresses and the default address of
-				// the Docker0 bridge
-				netIP := net.ParseIP(ip)
-				if netIP.To4() != nil && netIP.IsGlobalUnicast() && !netIP.Equal(net.ParseIP(dockerBridgeIP)) {
-					// The IP has to be set on the driver in order to test the IP using SSH
-					log.Debugf("[GetIP] Attempting SSH to IP %v", ip)
-					d.IPAddress = ip
-					_, err := drivers.RunSSHCommandFromDriver(d, "exit 0")
-					if err != nil {
-						// IP failed the SSH test so drop it so it's not saved on the driver if they all fail
-						d.IPAddress = ""
-						continue
-					}
-					return d.IPAddress, nil
-				}
-			}
-		}
-		log.Debug("[GetIP] could not connect to any IP, sleeping for 10 seconds then trying again")
-		time.Sleep(10 * time.Second)
+	configuredMacIPs, err := vm.WaitForNetIP(d.getCtx(), true)
+	if err != nil {
+		return "", err
 	}
 
+	log.Debugf("[GetIP] configuredMacIPs: %+v", configuredMacIPs)
+
+	for _, ips := range configuredMacIPs {
+		for _, ip := range ips {
+			// Try to filter out link local addresses and the default address of
+			// the Docker0 bridge
+			netIP := net.ParseIP(ip)
+			if netIP.To4() != nil && netIP.IsGlobalUnicast() && !netIP.Equal(net.ParseIP(dockerBridgeIP)) {
+				// The IP has to be set on the driver in order to test the IP using SSH
+				log.Debugf("[GetIP] Attempting SSH to IP %v", ip)
+				d.IPAddress = ip
+				_, err := drivers.RunSSHCommandFromDriver(d, "exit 0")
+				if err != nil {
+					// IP failed the SSH test so drop it so it's not saved on the driver if they all fail
+					d.IPAddress = ""
+					continue
+				}
+				return d.IPAddress, nil
+			}
+		}
+	}
 	return "", errors.New("No valid IP despite waiting for one - check DHCP status")
 }
 
