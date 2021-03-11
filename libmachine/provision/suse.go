@@ -40,7 +40,7 @@ func NewSLESProvisioner(d drivers.Driver) Provisioner {
 
 func NewOpenSUSEProvisioner(d drivers.Driver) Provisioner {
 	return &SUSEProvisioner{
-		NewSystemdProvisioner("openSUSE", d),
+		NewSystemdProvisioner("opensuse", d),
 	}
 }
 
@@ -49,7 +49,7 @@ type SUSEProvisioner struct {
 }
 
 func (provisioner *SUSEProvisioner) CompatibleWithHost() bool {
-	return strings.ToLower(provisioner.OsReleaseInfo.ID) == strings.ToLower(provisioner.OsReleaseID)
+	return strings.ToLower(provisioner.OsReleaseInfo.ID) == strings.ToLower(provisioner.OsReleaseID) || strings.Contains(provisioner.OsReleaseInfo.IDLike, "opensuse")
 }
 
 func (provisioner *SUSEProvisioner) String() string {
