@@ -8,31 +8,34 @@ type region struct {
 	AmiId string
 }
 
-// Ubuntu 16.04 LTS 20180228.1 hvm:ebs-ssd (amd64)
+// Ubuntu 20.04 LTS hvm:ebs-ssd (amd64)
 // See https://cloud-images.ubuntu.com/locator/ec2/
 var regionDetails map[string]*region = map[string]*region{
-	"af-south-1":      {"ami-03611e0f71e9d9f66"},
-	"ap-northeast-1":  {"ami-bcb7f6da"},
-	"ap-northeast-2":  {"ami-5073de3e"},
-	"ap-southeast-1":  {"ami-41e4af3d"},
-	"ap-southeast-2":  {"ami-c1498fa3"},
-	"ap-south-1":      {"ami-1083dc7f"},
-	"ap-east-1":       {"ami-9ca0d8ed"},
-	"ca-central-1":    {"ami-8d9e19e9"},
-	"cn-north-1":      {"ami-cc4499a1"}, // Note: this is 20180126
-	"cn-northwest-1":  {"ami-fd0e1a9f"}, // Note: this is 20180126
-	"eu-central-1":    {"ami-bc4925d3"},
-	"eu-north-1":      {"ami-017ff17f"},
-	"eu-west-1":       {"ami-0b541372"},
-	"eu-west-2":       {"ami-ff46a298"},
-	"eu-west-3":       {"ami-9465d3e9"},
-	"sa-east-1":       {"ami-b5501bd9"},
-	"us-east-1":       {"ami-927185ef"},
-	"us-east-2":       {"ami-b9daeddc"},
-	"us-west-1":       {"ami-264c4646"},
-	"us-west-2":       {"ami-78a22900"},
-	"us-gov-west-1":   {"ami-2561ea44"},
-	"us-gov-east-1":   {"ami-b740a6c6"},
+	"af-south-1":      {"ami-0f974a103be1a32cc"},
+	"ap-northeast-1":  {"ami-09ff2b6ef00accc2e"},
+	"ap-northeast-2":  {"ami-0b329fb1f17558744"},
+	"ap-northeast-3":  {"ami-0fa06c85437a220f5"},
+	"ap-southeast-1":  {"ami-048b4b1ddefe6759f"},
+	"ap-southeast-2":  {"ami-052a251c7ca533c26"},
+	"ap-south-1":      {"ami-01957c76cce45de38"},
+	"ap-east-1":       {"ami-0a7893426ebe74a8c"},
+	"ca-central-1":    {"ami-095509bf36d02a8e0"},
+	"cn-north-1":      {"ami-0592ccadb56e65f8d"},
+	"cn-northwest-1":  {"ami-007d0f254ea0f8588"},
+	"eu-central-1":    {"ami-0d3905203a039e3b0"},
+	"eu-north-1":      {"ami-0803bdfa576dd60c2"},
+	"eu-south-1":      {"ami-08a4feb1e48d2f9d8"},
+	"eu-west-1":       {"ami-0b7fd7bc9c6fb1c78"},
+	"eu-west-2":       {"ami-02ead6ecbd926d792"},
+	"eu-west-3":       {"ami-0d7b738ade930e24a"},
+	"me-south-1":      {"ami-0e53ffff39fa7b5c1"},
+	"sa-east-1":       {"ami-03f2389c2526e67bd"},
+	"us-east-1":       {"ami-04cc2b0ad9e30a9c8"},
+	"us-east-2":       {"ami-02fc6052104add5ae"},
+	"us-west-1":       {"ami-07be40433001d2433"},
+	"us-west-2":       {"ami-0a62a78cfedc09d76"},
+	"us-gov-west-1":   {"ami-0c39aacd1cc8a1ccf"},
+	"us-gov-east-1":   {"ami-0dec4096f1af85e9b"},
 	"custom-endpoint": {""},
 }
 
