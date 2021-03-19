@@ -1,14 +1,13 @@
 package commands
 
 import (
-	"fmt"
-
-	"strings"
-
 	"errors"
+	"fmt"
+	"strings"
 
 	"github.com/rancher/machine/libmachine"
 	"github.com/rancher/machine/libmachine/log"
+	"github.com/rancher/machine/libmachine/mcnerror"
 )
 
 func cmdRm(c CommandLine, api libmachine.API) error {
@@ -31,7 +30,11 @@ func cmdRm(c CommandLine, api libmachine.API) error {
 	for _, hostName := range c.Args() {
 		err := removeRemoteMachine(hostName, api)
 		if err != nil {
-			errorOccurred = collectError(fmt.Sprintf("Error removing host %q: %s", hostName, err), force, errorOccurred)
+			if _, ok := err.(mcnerror.ErrHostDoesNotExist); !ok {
+				errorOccurred = collectError(fmt.Sprintf("Error removing host %q: %s", hostName, err), force, errorOccurred)
+			} else {
+				log.Infof("Machine config for %s does not exists, so nothing to do...", hostName)
+			}
 		}
 
 		if err == nil || force {
@@ -70,7 +73,12 @@ func removeRemoteMachine(hostName string, api libmachine.API) error {
 		return loaderr
 	}
 
-	return currentHost.Driver.Remove()
+	err := currentHost.Driver.Remove()
+	if err != nil && !strings.Contains(strings.ToLower(err.Error()), "not found") {
+		return err
+	}
+
+	return nil
 }
 
 func removeLocalMachine(hostName string, api libmachine.API) error {

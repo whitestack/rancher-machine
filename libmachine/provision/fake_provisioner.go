@@ -81,6 +81,10 @@ func (fp *FakeProvisioner) GetOsReleaseInfo() (*OsRelease, error) {
 	return nil, nil
 }
 
+func (fp *FakeProvisioner) GetPackages() []string {
+	return nil
+}
+
 type NetstatProvisioner struct {
 	*FakeProvisioner
 }

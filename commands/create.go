@@ -1,10 +1,12 @@
 package commands
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -25,6 +27,7 @@ import (
 	"github.com/rancher/machine/libmachine/mcnflag"
 	"github.com/rancher/machine/libmachine/swarm"
 	"github.com/urfave/cli"
+	"gopkg.in/yaml.v2"
 )
 
 var (
@@ -128,6 +131,11 @@ var (
 			Usage: "Support extra SANs for TLS certs",
 			Value: &cli.StringSlice{},
 		},
+		cli.StringFlag{
+			Name:  "custom-install-script",
+			Usage: "Use a custom provisioning script instead of installing docker",
+			Value: "",
+		},
 	}
 )
 
@@ -218,6 +226,23 @@ func cmdCreateInner(c CommandLine, api libmachine.API) error {
 	// concrete type rpcdriver.RpcFlags).
 	mcnFlags := h.Driver.GetCreateFlags()
 	driverOpts := getDriverOpts(c, mcnFlags)
+	userdataFlag := drivers.DriverUserdataFlag(h.Driver)
+
+	customInstallScript := c.String("custom-install-script")
+	if customInstallScript != "" {
+		h.HostOptions.CustomInstallScript = customInstallScript
+		h.HostOptions.AuthOptions = nil
+		h.HostOptions.EngineOptions = nil
+		h.HostOptions.SwarmOptions = nil
+
+		if userdataFlag != "" {
+			err = updateUserdataFile(driverOpts, userdataFlag, customInstallScript)
+			if err != nil {
+				return fmt.Errorf("could not alter cloud-init file: %v", err)
+			}
+			log.Debugf("user data file replaced with %v", driverOpts.Values[userdataFlag])
+		}
+	}
 
 	if err := h.Driver.SetConfigFromFlags(driverOpts); err != nil {
 		return fmt.Errorf("Error setting machine configuration from flags provided: %s", err)
@@ -245,7 +270,9 @@ func cmdCreateInner(c CommandLine, api libmachine.API) error {
 		return fmt.Errorf("Error attempting to save store: %s", err)
 	}
 
-	log.Infof("To see how to connect your Docker Client to the Docker Engine running on this virtual machine, run: %s env %s", os.Args[0], name)
+	if customInstallScript == "" {
+		log.Infof("To see how to connect your Docker Client to the Docker Engine running on this virtual machine, run: %s env %s", os.Args[0], name)
+	}
 
 	return nil
 }
@@ -338,7 +365,7 @@ func cmdCreateOuter(c CommandLine, api libmachine.API) error {
 	return c.Application().Run(os.Args)
 }
 
-func getDriverOpts(c CommandLine, mcnflags []mcnflag.Flag) drivers.DriverOptions {
+func getDriverOpts(c CommandLine, mcnflags []mcnflag.Flag) *rpcdriver.RPCFlags {
 	// TODO: This function is pretty damn YOLO and would benefit from some
 	// sanity checking around types and assertions.
 	//
@@ -351,11 +378,6 @@ func getDriverOpts(c CommandLine, mcnflags []mcnflag.Flag) drivers.DriverOptions
 
 	for _, f := range mcnflags {
 		driverOpts.Values[f.String()] = f.Default()
-
-		// Hardcoded logic for boolean... :(
-		if f.Default() == nil {
-			driverOpts.Values[f.String()] = false
-		}
 	}
 
 	for _, name := range c.FlagNames() {
@@ -372,7 +394,7 @@ func getDriverOpts(c CommandLine, mcnflags []mcnflag.Flag) drivers.DriverOptions
 		}
 	}
 
-	return driverOpts
+	return &driverOpts
 }
 
 func convertMcnFlagsToCliFlags(mcnFlags []mcnflag.Flag) ([]cli.Flag, error) {
@@ -457,4 +479,123 @@ func tlsPath(c CommandLine, flag string, defaultName string) string {
 	}
 
 	return filepath.Join(mcndirs.GetMachineCertDir(), defaultName)
+}
+
+// If the user has provided a userdata file, then we add the customInstallScript to their userdata file.
+// This assumes that the user-provided userdata file start with a shebang or `#cloud-config`
+// If the user has not provided any userdata file, then we set the customInstallScript as the userdata file.
+func updateUserdataFile(driverOpts *rpcdriver.RPCFlags, userdataFlag, customInstallScript string) error {
+	var userdataContent []byte
+	var err error
+	userdataFile := driverOpts.String(userdataFlag)
+
+	if userdataFile == "" {
+		if !strings.HasSuffix(userdataFlag, "cloud-config") {
+			// If the userdata file is not set, then the customInstallScript file is set as the userdata file.
+			driverOpts.Values[userdataFlag] = customInstallScript
+			return nil
+		}
+
+		// Drivers like vmwarevsphere expect the userdata to be in cloud-config format.
+		// Setting userdataContent like this will coerce the custom script into cloud-config format.
+		userdataContent = []byte("#cloud-config")
+	} else {
+		userdataContent, err = ioutil.ReadFile(userdataFile)
+		if err != nil {
+			return err
+		}
+	}
+
+	customScriptContent, err := ioutil.ReadFile(customInstallScript)
+	if err != nil {
+		return err
+	}
+	// Remove the shebang
+	customScriptContent = regexp.MustCompile(`^#!.*\n`).ReplaceAll(customScriptContent, nil)
+
+	modifiedUserdataFile, err := ioutil.TempFile("", "modified-user-data")
+	if err != nil {
+		return err
+	}
+	defer modifiedUserdataFile.Close()
+
+	if err := replaceUserdataFile(userdataContent, customScriptContent, modifiedUserdataFile); err != nil {
+		return err
+	}
+
+	driverOpts.Values[userdataFlag] = modifiedUserdataFile.Name()
+
+	return nil
+}
+
+// replaceUserdataFile adds the customScriptContent to the user-provided userdata file and creates a new
+// temp file for this content.
+// If the user-provided userdata file starts with a shebang, then we can add the customScriptContent to this file.
+// fi the user-provided userdata file is in cloud-config format, then we add the customScriptContent to the `runcmd` directive.
+func replaceUserdataFile(userdataContent, customScriptContent []byte, newUserDataFile *os.File) error {
+	switch {
+	case bytes.HasPrefix(userdataContent, []byte("#!")):
+		// The user provided a script file, so the customInstallScript contents is appended to this file
+		// and written to a new file.
+		_, err := newUserDataFile.Write(bytes.Join([][]byte{userdataContent, customScriptContent}, []byte("\n\n")))
+		if err != nil {
+			return err
+		}
+
+	case bytes.HasPrefix(userdataContent, []byte("#cloud-config")):
+		// The user provided a cloud-config file, so the customInstallScript context is added to the
+		// "runcmd" section of the YAML.
+		cf := make(map[interface{}]interface{})
+		if err := yaml.Unmarshal(userdataContent, &cf); err != nil {
+			return err
+		}
+
+		// Add to the write_files directive
+		writeFile := map[string]string{
+			"content":     string(customScriptContent),
+			"path":        "/usr/local/custom_script/install.sh",
+			"permissions": "0644",
+		}
+		if err := addToCloudConfig(cf, "write_files", writeFile); err != nil {
+			return err
+		}
+
+		// Add to the runmd directive
+		if err := addToCloudConfig(cf, "runcmd", fmt.Sprintf("sh %s", writeFile["path"])); err != nil {
+			return err
+		}
+
+		userdataContent, err := yaml.Marshal(cf)
+		if err != nil {
+			return err
+		}
+		log.Debugf("Modified userdata file contents: %+v", string(userdataContent))
+
+		userdataContent = append([]byte("#cloud-config\n"), userdataContent...)
+		_, err = newUserDataFile.Write(userdataContent)
+		if err != nil {
+			return err
+		}
+
+	default:
+		return fmt.Errorf("existing userdata file does not begin with '#!' or '#cloud-config'")
+	}
+
+	return nil
+}
+
+func addToCloudConfig(cf map[interface{}]interface{}, key string, value interface{}) error {
+	switch section := cf[key].(type) {
+	case []interface{}:
+		section = append(section, value)
+		cf[key] = section
+
+	case nil:
+		cf[key] = []interface{}{value}
+
+	default:
+		return fmt.Errorf("unable to get %s from cloud-config YAML", key)
+	}
+
+	return nil
 }

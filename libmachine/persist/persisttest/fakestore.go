@@ -61,3 +61,7 @@ func (fs *FakeStore) Save(host *host.Host) error {
 	}
 	return fs.SaveErr
 }
+
+func (fs *FakeStore) GetMachinesDir() string {
+	return ""
+}

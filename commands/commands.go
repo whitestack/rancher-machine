@@ -142,23 +142,34 @@ func runAction(actionName string, c CommandLine, api libmachine.API) error {
 
 func runCommand(command func(commandLine CommandLine, api libmachine.API) error) func(context *cli.Context) {
 	return func(context *cli.Context) {
-		api := libmachine.NewClient(mcndirs.GetBaseDir(), mcndirs.GetMachineCertDir())
+		api := libmachine.NewClient(context.GlobalString("storage-path"), mcndirs.GetMachineCertDir())
 		defer api.Close()
 
 		if context.GlobalBool("native-ssh") {
 			api.SSHClientType = ssh.Native
 		}
 		api.GithubAPIToken = context.GlobalString("github-api-token")
-		api.Filestore.Path = context.GlobalString("storage-path")
 
 		// TODO (nathanleclaire): These should ultimately be accessed
 		// through the libmachine client by the rest of the code and
 		// not through their respective modules.  For now, however,
 		// they are also being set the way that they originally were
 		// set to preserve backwards compatibility.
-		mcndirs.BaseDir = api.Filestore.Path
+		mcndirs.BaseDir = context.GlobalString("storage-path")
 		mcnutils.GithubAPIToken = api.GithubAPIToken
 		ssh.SetDefaultClient(api.SSHClientType)
+
+		secretName, secretNamespace := context.GlobalString("secret-name"), context.GlobalString("secret-namespace")
+		if secretName != "" {
+			secretStore, err := persist.NewSecretStore(api.Store, secretName, secretNamespace, context.GlobalString("kubeconfig"))
+			if err != nil {
+				log.Error(err)
+				osExit(1)
+				return
+			}
+
+			api.Store = secretStore
+		}
 
 		if err := command(&contextCommandLine{context}, api); err != nil {
 			log.Error(err)
@@ -171,6 +182,9 @@ func runCommand(command func(commandLine CommandLine, api libmachine.API) error)
 					osExit(3)
 					return
 				}
+			} else if _, ok := err.(notFoundError); ok {
+				osExit(4)
+				return
 			}
 
 			osExit(1)

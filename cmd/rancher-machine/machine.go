@@ -160,6 +160,24 @@ func main() {
 			Usage:  "BugSnag API token for crash reporting",
 			Value:  "",
 		},
+		cli.StringFlag{
+			EnvVar: "K8S_SECRET_NAME",
+			Name:   "secret-name",
+			Usage:  "The name of a k8s secret to pull and save machine config",
+			Value:  "",
+		},
+		cli.StringFlag{
+			EnvVar: "K8S_SECRET_NAMESPACE",
+			Name:   "secret-namespace",
+			Usage:  "The namespace of a k8s secret to pull and save machine config",
+			Value:  "default",
+		},
+		cli.StringFlag{
+			EnvVar: "KUBECONFIG",
+			Name:   "kubeconfig",
+			Usage:  "The path to the kubeconfig needed for secrets management",
+			Value:  "",
+		},
 	}
 
 	if err := app.Run(os.Args); err != nil {

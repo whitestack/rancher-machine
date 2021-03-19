@@ -20,6 +20,8 @@ import (
 	"github.com/rancher/machine/libmachine/versioncmp"
 )
 
+const noDockerError = "Docker was not provisioned on machine %s, %s"
+
 var (
 	validHostNamePattern                  = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9\-\.]*$`)
 	stdSSHClientCreator  SSHClientCreator = &StandardSSHClientCreator{}
@@ -47,12 +49,13 @@ type Host struct {
 }
 
 type Options struct {
-	Driver        string
-	Memory        int
-	Disk          int
-	EngineOptions *engine.Options
-	SwarmOptions  *swarm.Options
-	AuthOptions   *auth.Options
+	Driver              string
+	Memory              int
+	Disk                int
+	CustomInstallScript string
+	EngineOptions       *engine.Options
+	SwarmOptions        *swarm.Options
+	AuthOptions         *auth.Options
 }
 
 type Metadata struct {
@@ -184,6 +187,11 @@ func (h *Host) DockerVersion() (string, error) {
 }
 
 func (h *Host) Upgrade() error {
+	if h.HostOptions.AuthOptions == nil {
+		log.Warnf(noDockerError, h.Name, "cannot upgrade docker")
+		return nil
+	}
+
 	machineState, err := h.Driver.GetState()
 	if err != nil {
 		return err
@@ -255,6 +263,11 @@ func (h *Host) AuthOptions() *auth.Options {
 }
 
 func (h *Host) ConfigureAuth() error {
+	if h.HostOptions.AuthOptions == nil {
+		log.Warnf(noDockerError, h.Name, "cannot configure auth")
+		return nil
+	}
+
 	provisioner, err := provision.DetectProvisioner(h.Driver)
 	if err != nil {
 		return err
@@ -269,6 +282,11 @@ func (h *Host) ConfigureAuth() error {
 }
 
 func (h *Host) ConfigureAllAuth() error {
+	if h.HostOptions.AuthOptions == nil {
+		log.Warnf(noDockerError, h.Name, "cannot configure auth")
+		return nil
+	}
+
 	log.Info("Regenerating local certificates")
 	if err := cert.BootstrapCertificates(h.AuthOptions()); err != nil {
 		return err
@@ -280,6 +298,11 @@ func (h *Host) Provision() error {
 	provisioner, err := provision.DetectProvisioner(h.Driver)
 	if err != nil {
 		return err
+	}
+
+	if h.HostOptions.CustomInstallScript != "" {
+		log.Infof("Machine %s was provisioned with a custom install script, using this script for provisioning", h.Name)
+		return provision.WithCustomScript(provisioner, h.HostOptions.CustomInstallScript)
 	}
 
 	return provisioner.Provision(*h.HostOptions.SwarmOptions, *h.HostOptions.AuthOptions, *h.HostOptions.EngineOptions)

@@ -57,6 +57,9 @@ type Provisioner interface {
 	// Run a package action e.g. install
 	Package(name string, action pkgaction.PackageAction) error
 
+	// Get the pakcages to install
+	GetPackages() []string
+
 	// Get Hostname
 	Hostname() (string, error)
 
