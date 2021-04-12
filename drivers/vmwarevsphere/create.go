@@ -275,7 +275,7 @@ func (d *Driver) createFromLibraryName() error {
 		return err
 	}
 
-	folders, err := d.datacenter.Folders(d.getCtx())
+	folder, err := d.findFolder()
 	if err != nil {
 		return err
 	}
@@ -333,7 +333,7 @@ func (d *Driver) createFromLibraryName() error {
 		Target: vcenter.Target{
 			ResourcePoolID: d.resourcepool.Reference().Value,
 			HostID:         hostId,
-			FolderID:       folders.VmFolder.Reference().Value,
+			FolderID:       folder.Reference().Value,
 		},
 	}
 
