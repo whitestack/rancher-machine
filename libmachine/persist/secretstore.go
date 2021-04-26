@@ -167,7 +167,7 @@ func (s *secretStore) extractConfig() error {
 
 	extractedConfig, ok := secret.Data[machineConfigSecretKey]
 	if !ok {
-		log.Infof("no data in %s", machineConfigSecretKey)
+		log.Debugf("no data in %s", machineConfigSecretKey)
 		return nil
 	}
 
