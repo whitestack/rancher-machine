@@ -262,12 +262,13 @@ func (d *Driver) PreCreateCheck() error {
 		}
 	}
 
-	// Read the userdata file
-	file, err := ioutil.ReadFile(d.Userdata)
-	if err != nil {
-		return fmt.Errorf("cannot read userdata file %v: %v", d.Userdata, err)
+	if d.Userdata != "" {
+		file, err := ioutil.ReadFile(d.Userdata)
+		if err != nil {
+			return fmt.Errorf("cannot read userdata file %v: %v", d.Userdata, err)
+		}
+		d.Userdata = string(file)
 	}
-	d.Userdata = string(file)
 
 	return nil
 }
