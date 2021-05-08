@@ -3,9 +3,8 @@ package main
 import (
 	"fmt"
 	"os"
-	"strconv"
-
 	"path/filepath"
+	"strconv"
 
 	"github.com/rancher/machine/commands"
 	"github.com/rancher/machine/commands/mcndirs"
@@ -18,6 +17,7 @@ import (
 	"github.com/rancher/machine/drivers/hyperv"
 	"github.com/rancher/machine/drivers/none"
 	"github.com/rancher/machine/drivers/openstack"
+	"github.com/rancher/machine/drivers/pod"
 	"github.com/rancher/machine/drivers/rackspace"
 	"github.com/rancher/machine/drivers/softlayer"
 	"github.com/rancher/machine/drivers/virtualbox"
@@ -217,6 +217,8 @@ func runDriver(driverName string) {
 		plugin.RegisterDriver(vmwarevcloudair.NewDriver("", ""))
 	case "vmwarevsphere":
 		plugin.RegisterDriver(vmwarevsphere.NewDriver("", ""))
+	case "pod":
+		plugin.RegisterDriver(pod.NewDriver("", ""))
 	default:
 		fmt.Fprintf(os.Stderr, "Unsupported driver: %s\n", driverName)
 		os.Exit(1)
