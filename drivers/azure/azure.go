@@ -63,6 +63,7 @@ const (
 	flAzureClientID          = "azure-client-id"
 	flAzureClientSecret      = "azure-client-secret"
 	flAzureNSG               = "azure-nsg"
+	flAzurePlan              = "azure-plan"
 )
 
 const (
@@ -90,6 +91,7 @@ type Driver struct {
 	SubnetPrefix    string
 	AvailabilitySet string
 	NSG             string
+	Plan            string
 	ManagedDisks    bool
 	FaultCount      int
 	UpdateCount     int
@@ -206,6 +208,10 @@ func (d *Driver) GetCreateFlags() []mcnflag.Flag {
 			Usage:  "Azure Network Security Group to assign this node to (accepts either a name or resource ID, default is to create a new NSG for each machine)",
 			EnvVar: "AZURE_NSG",
 			Value:  "",
+		},
+		mcnflag.StringFlag{
+			Name:  flAzurePlan,
+			Usage: "Purchase plan for Azure Virtual Machine (in <name>:<publisher>:<product> format)",
 		},
 		mcnflag.BoolFlag{
 			Name:   flAzureManagedDisks,
@@ -324,6 +330,7 @@ func (d *Driver) SetConfigFromFlags(fl drivers.DriverOptions) error {
 	d.UpdateCount = fl.Int(flAzureUpdateDomainCount)
 	d.DiskSize = fl.Int(flAzureDiskSize)
 	d.NSG = fl.String(flAzureNSG)
+	d.Plan = fl.String(flAzurePlan)
 
 	d.ClientID = fl.String(flAzureClientID)
 	d.ClientSecret = fl.String(flAzureClientSecret)
@@ -451,7 +458,7 @@ func (d *Driver) Create() error {
 		return err
 	}
 	if err := c.CreateVirtualMachine(ctx, d.ResourceGroup, d.naming().VM(), d.Location, d.Size, d.deploymentCtx.AvailabilitySetID,
-		d.deploymentCtx.NetworkInterfaceID, d.BaseDriver.SSHUser, d.deploymentCtx.SSHPublicKey, d.Image, customData, d.deploymentCtx.StorageAccount,
+		d.deploymentCtx.NetworkInterfaceID, d.BaseDriver.SSHUser, d.deploymentCtx.SSHPublicKey, d.Image, d.Plan, customData, d.deploymentCtx.StorageAccount,
 		d.ManagedDisks, d.StorageType, int32(d.DiskSize)); err != nil {
 		return err
 	}

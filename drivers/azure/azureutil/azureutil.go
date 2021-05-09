@@ -558,12 +558,20 @@ func (a AzureClient) removeOSDiskBlob(ctx context.Context, resourceGroup, vmName
 
 // CreateVirtualMachine creates a VM according to the specifications and adds an SSH key to access the VM
 func (a AzureClient) CreateVirtualMachine(ctx context.Context, resourceGroup, name, location, size, availabilitySetID, networkInterfaceID,
-	username, sshPublicKey, imageName, customData string, storageAccount *storage.AccountProperties, isManaged bool,
+	username, sshPublicKey, imageName, imagePlan, customData string, storageAccount *storage.AccountProperties, isManaged bool,
 	storageType string, diskSize int32) error {
 	// TODO: "VM created from Image cannot have blob based disks. All disks have to be managed disks."
 	imgReference, err := a.getImageReference(ctx, imageName, location)
 	if err != nil {
 		return err
+	}
+
+	var imagePurchasePlan *compute.Plan
+	if imagePlan != "" {
+		imagePurchasePlan, err = a.getImagePurchasePlan(ctx, imagePlan)
+		if err != nil {
+			return err
+		}
 	}
 
 	log.Info("Creating virtual machine.", logutil.Fields{
@@ -572,6 +580,7 @@ func (a AzureClient) CreateVirtualMachine(ctx context.Context, resourceGroup, na
 		"size":     size,
 		"username": username,
 		"osImage":  imageName,
+		"plan":     imagePurchasePlan,
 	})
 
 	sshKeyPath := fmt.Sprintf("/home/%s/.ssh/authorized_keys", username)
@@ -621,6 +630,7 @@ func (a AzureClient) CreateVirtualMachine(ctx context.Context, resourceGroup, na
 					OsDisk:         getOSDisk(name, storageAccount, isManaged, storageType, diskSize),
 				},
 			},
+			Plan: imagePurchasePlan,
 		})
 	if err != nil {
 		return err
@@ -650,6 +660,17 @@ func (a AzureClient) getImageReference(ctx context.Context, image, location stri
 		}, nil
 	}
 	return nil, fmt.Errorf("image provided must be an image URN or an ARM resource identifier")
+}
+
+func (a AzureClient) getImagePurchasePlan(ctx context.Context, plan string) (*compute.Plan, error) {
+	if urn := strings.Split(plan, ":"); len(urn) == 3 {
+		return &compute.Plan{
+			Name:      to.StringPtr(urn[0]),
+			Publisher: to.StringPtr(urn[1]),
+			Product:   to.StringPtr(urn[2]),
+		}, nil
+	}
+	return nil, fmt.Errorf("plan provided must be an valid purchase plan identifier")
 }
 
 // GetOSDisk creates and returns pointer to a disk that is configured for either managed or unmanaged disks depending
