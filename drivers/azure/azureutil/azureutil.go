@@ -662,12 +662,13 @@ func (a AzureClient) getImageReference(ctx context.Context, image, location stri
 	return nil, fmt.Errorf("image provided must be an image URN or an ARM resource identifier")
 }
 
+// getImagePurchasePlan parses a publisher:product:plan as a image purchase plan reference
 func (a AzureClient) getImagePurchasePlan(ctx context.Context, plan string) (*compute.Plan, error) {
 	if urn := strings.Split(plan, ":"); len(urn) == 3 {
 		return &compute.Plan{
-			Name:      to.StringPtr(urn[0]),
-			Publisher: to.StringPtr(urn[1]),
-			Product:   to.StringPtr(urn[2]),
+			Publisher: to.StringPtr(urn[0]),
+			Product:   to.StringPtr(urn[1]),
+			Name:      to.StringPtr(urn[2]),
 		}, nil
 	}
 	return nil, fmt.Errorf("plan provided must be an valid purchase plan identifier")

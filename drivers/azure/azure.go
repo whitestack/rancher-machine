@@ -211,7 +211,7 @@ func (d *Driver) GetCreateFlags() []mcnflag.Flag {
 		},
 		mcnflag.StringFlag{
 			Name:  flAzurePlan,
-			Usage: "Purchase plan for Azure Virtual Machine (in <name>:<publisher>:<product> format)",
+			Usage: "Purchase plan for Azure Virtual Machine (in <publisher>:<product>:<plan> format)",
 		},
 		mcnflag.BoolFlag{
 			Name:   flAzureManagedDisks,
