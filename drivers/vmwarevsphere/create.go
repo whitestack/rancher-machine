@@ -275,7 +275,7 @@ func (d *Driver) createFromLibraryName() error {
 		return err
 	}
 
-	folders, err := d.datacenter.Folders(d.getCtx())
+	folder, err := d.findFolder()
 	if err != nil {
 		return err
 	}
@@ -303,15 +303,6 @@ func (d *Driver) createFromLibraryName() error {
 	if !ok {
 		return fmt.Errorf("Content Library item is not a template: %q is a %T", d.CloneFrom, item)
 	}
-
-	var nets []vcenter.NetworkMapping
-	for k, n := range d.networks {
-		nets = append(nets, vcenter.NetworkMapping{
-			Key:   k,
-			Value: n.Reference().Value,
-		})
-	}
-
 	hostId := ""
 	if d.hostsystem != nil {
 		hostId = d.hostsystem.Reference().Value
@@ -320,6 +311,30 @@ func (d *Driver) createFromLibraryName() error {
 	ds, err := d.getDatastore(&types.VirtualMachineConfigSpec{})
 	if err != nil {
 		return err
+	}
+	fr := vcenter.FilterRequest{Target: vcenter.Target{
+                        ResourcePoolID: d.resourcepool.Reference().Value,
+                        HostID:         hostId,
+                        FolderID:       folder.Reference().Value,
+        },
+        }
+
+	m := vcenter.NewManager(libManager.Client)
+	r, err := m.FilterLibraryItem(d.getCtx(), item.ID, fr)
+	if err != nil {
+                return err
+	}
+	if len(d.networks) != len(r.Networks) {
+		return fmt.Errorf("Mismatch in number of networks in content library template %s and rancher template", d.CloneFrom)
+	}
+	netIndex := 0
+	var nets []vcenter.NetworkMapping
+	for _, n := range d.networks {
+		nets = append(nets, vcenter.NetworkMapping{
+			Key:   r.Networks[netIndex],
+			Value: n.Reference().Value,
+		})
+		netIndex++
 	}
 
 	deploy := vcenter.Deploy{
@@ -333,11 +348,9 @@ func (d *Driver) createFromLibraryName() error {
 		Target: vcenter.Target{
 			ResourcePoolID: d.resourcepool.Reference().Value,
 			HostID:         hostId,
-			FolderID:       folders.VmFolder.Reference().Value,
+			FolderID:       folder.Reference().Value,
 		},
 	}
-
-	m := vcenter.NewManager(libManager.Client)
 
 	ref, err := m.DeployLibraryItem(d.getCtx(), item.ID, deploy)
 	if err != nil {
