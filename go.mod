@@ -2,7 +2,10 @@ module github.com/rancher/machine
 
 go 1.15
 
-replace github.com/docker/docker => github.com/moby/moby v1.4.2-0.20170731201646-1009e6a40b29
+replace (
+	github.com/docker/docker => github.com/moby/moby v1.4.2-0.20170731201646-1009e6a40b29
+	github.com/urfave/cli => github.com/urfave/cli v1.11.1-0.20151120215642-0302d3914d2a // newer versions of this will break the rpc binding code
+)
 
 require (
 	github.com/Azure/azure-sdk-for-go v41.2.0+incompatible
