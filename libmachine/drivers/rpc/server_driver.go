@@ -11,7 +11,6 @@ import (
 	"github.com/rancher/machine/libmachine/mcnflag"
 	"github.com/rancher/machine/libmachine/state"
 	"github.com/rancher/machine/libmachine/version"
-	"github.com/urfave/cli"
 )
 
 type Stacker interface {
@@ -34,7 +33,6 @@ func init() {
 	gob.Register(new(mcnflag.StringFlag))
 	gob.Register(new(mcnflag.StringSliceFlag))
 	gob.Register(new(mcnflag.BoolFlag))
-	gob.Register(new(cli.StringSlice))
 }
 
 type RPCFlags struct {
