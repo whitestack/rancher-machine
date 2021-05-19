@@ -136,6 +136,9 @@ func (c *GenericClient) VolumeCreate(d *Driver) (string, error) {
 	if d.VolumeType != "" {
 		opts.VolumeType = d.VolumeType
 	}
+	if d.AvailabilityZone != "" {
+		opts.AvailabilityZone = d.AvailabilityZone
+	}
 	vol, err := volumes.Create(c.BlockStorage, opts).Extract()
 	if err != nil {
 		return "", err
