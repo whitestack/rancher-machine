@@ -346,9 +346,12 @@ func (d *Driver) createFromLibraryName() error {
 		NumCPUs:    int32(d.CPU),
 		MemoryMB:   int64(d.Memory),
 		VAppConfig: d.getVAppConfig(),
-        }
+	}
 
 	task, err := vm.Reconfigure(d.getCtx(), spec)
+	if err != nil {
+		return err
+	}
 
 	err = task.Wait(d.getCtx())
 	if err != nil {
