@@ -38,6 +38,7 @@ const (
 const (
 	flAzureEnvironment       = "azure-environment"
 	flAzureSubscriptionID    = "azure-subscription-id"
+	flAzureTenantID          = "azure-tenant-id"
 	flAzureResourceGroup     = "azure-resource-group"
 	flAzureSSHUser           = "azure-ssh-user"
 	flAzureDockerPort        = "azure-docker-port"
@@ -79,6 +80,7 @@ type Driver struct {
 
 	Environment    string
 	SubscriptionID string
+	TenantID       string
 	ResourceGroup  string
 
 	DockerPort      int
@@ -140,6 +142,11 @@ func (d *Driver) GetCreateFlags() []mcnflag.Flag {
 			Name:   flAzureSubscriptionID,
 			Usage:  "Azure Subscription ID",
 			EnvVar: "AZURE_SUBSCRIPTION_ID",
+		},
+		mcnflag.StringFlag{
+			Name:   flAzureTenantID,
+			Usage:  "Azure Tenant ID",
+			EnvVar: "AZURE_TENANT_ID",
 		},
 		mcnflag.StringFlag{
 			Name:   flAzureResourceGroup,
@@ -327,6 +334,7 @@ func (d *Driver) SetConfigFromFlags(fl drivers.DriverOptions) error {
 
 	d.ClientID = fl.String(flAzureClientID)
 	d.ClientSecret = fl.String(flAzureClientSecret)
+	d.TenantID = fl.String(flAzureTenantID)
 
 	// Set flags on the BaseDriver
 	d.BaseDriver.SSHPort = sshPort
