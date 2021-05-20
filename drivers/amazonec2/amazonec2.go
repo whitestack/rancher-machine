@@ -58,6 +58,7 @@ var (
 	kubeApiPort                          = 6443
 	httpPort                             = 80
 	httpsPort                            = 443
+	supervisorPort                       = 9345
 	nodeExporter                         = 9796
 	etcdPorts                            = []int64{2379, 2380}
 	clusterManagerPorts                  = []int64{6443, 6443}
@@ -1310,6 +1311,20 @@ func (d *Driver) configureSecurityGroupPermissions(group *ec2.SecurityGroup) ([]
 				FromPort:   aws.Int64(int64(kubeApiPort)),
 				ToPort:     aws.Int64(int64(kubeApiPort)),
 				IpRanges:   []*ec2.IpRange{{CidrIp: aws.String(ipRange)}},
+			})
+		}
+
+		// rke2 supervisor
+		if !hasPortsInbound[fmt.Sprintf("%d/tcp", supervisorPort)] {
+			inboundPerms = append(inboundPerms, &ec2.IpPermission{
+				IpProtocol: aws.String("tcp"),
+				FromPort:   aws.Int64(int64(supervisorPort)),
+				ToPort:     aws.Int64(int64(supervisorPort)),
+				UserIdGroupPairs: []*ec2.UserIdGroupPair{
+					{
+						GroupId: group.GroupId,
+					},
+				},
 			})
 		}
 
