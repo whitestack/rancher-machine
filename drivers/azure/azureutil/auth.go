@@ -56,21 +56,22 @@ var (
 // AuthenticateDeviceFlow fetches a token from the local file cache or initiates a consent
 // flow and waits for token to be obtained. Obtained token is stored in a file cache for
 // future use and refreshing.
-func AuthenticateDeviceFlow(ctx context.Context, env azure.Environment, subscriptionID string) (*autorest.BearerAuthorizer, error) {
+func AuthenticateDeviceFlow(ctx context.Context, env azure.Environment, subscriptionID, tenantID string) (*autorest.BearerAuthorizer, error) {
 	clientID, ok := appIDs[env.Name]
 	if !ok {
 		return nil, fmt.Errorf("docker-machine application not set up for Azure environment %q", env.Name)
 	}
-	// We locate the tenant ID of the subscription as we store tokens per
-	// tenant (which could have multiple subscriptions)
-	tenantID, err := loadOrFindTenantID(ctx, env, subscriptionID)
-	if err != nil {
-		return nil, err
+
+	if tenantID == "" {
+		// We locate the tenant ID of the subscription as we store tokens per
+		// tenant (which could have multiple subscriptions)
+		var err error
+		tenantID, err = loadOrFindTenantID(ctx, env, subscriptionID)
+		if err != nil {
+			return nil, err
+		}
 	}
 	tokenPath := tokenCachePath(tenantID)
-	if err != nil {
-		return nil, err
-	}
 	deviceFlowConfig := auth.DeviceFlowConfig{
 		ClientID:    clientID,
 		TenantID:    tenantID,
@@ -109,10 +110,13 @@ func AuthenticateDeviceFlow(ctx context.Context, env azure.Environment, subscrip
 
 // AuthenticateClientCredentials uses given client credentials to return a
 // service principal token. Generated token is not stored in a cache file or refreshed.
-func AuthenticateClientCredentials(ctx context.Context, env azure.Environment, subscriptionID, clientID, clientSecret string) (*autorest.BearerAuthorizer, error) {
-	tenantID, err := loadOrFindTenantID(ctx, env, subscriptionID)
-	if err != nil {
-		return nil, err
+func AuthenticateClientCredentials(ctx context.Context, env azure.Environment, subscriptionID, tenantID, clientID, clientSecret string) (*autorest.BearerAuthorizer, error) {
+	if tenantID == "" {
+		var err error
+		tenantID, err = loadOrFindTenantID(ctx, env, subscriptionID)
+		if err != nil {
+			return nil, err
+		}
 	}
 	clientCredentialsConfig := auth.ClientCredentialsConfig{
 		ClientID:     clientID,

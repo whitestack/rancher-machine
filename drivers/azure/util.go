@@ -49,13 +49,13 @@ func (d *Driver) newAzureClient(ctx context.Context) (*azureutil.AzureClient, er
 	)
 	if d.ClientID != "" && d.ClientSecret != "" { // use client credentials auth
 		log.Debug("Using Azure client credentials.")
-		authorizer, err = azureutil.AuthenticateClientCredentials(ctx, env, d.SubscriptionID, d.ClientID, d.ClientSecret)
+		authorizer, err = azureutil.AuthenticateClientCredentials(ctx, env, d.SubscriptionID, d.TenantID, d.ClientID, d.ClientSecret)
 		if err != nil {
 			return nil, fmt.Errorf("Failed to authenticate using client credentials: %+v", err)
 		}
 	} else { // use browser-based device auth
 		log.Debug("Using Azure device flow authentication.")
-		authorizer, err = azureutil.AuthenticateDeviceFlow(ctx, env, d.SubscriptionID)
+		authorizer, err = azureutil.AuthenticateDeviceFlow(ctx, env, d.SubscriptionID, d.TenantID)
 		if err != nil {
 			return nil, fmt.Errorf("Error creating Azure client: %v", err)
 		}
