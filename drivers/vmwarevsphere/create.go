@@ -338,7 +338,26 @@ func (d *Driver) createFromLibraryName() error {
 		return err
 	}
 
+	// At this point, the VM is deployed from content library with defaults from template
+	// Reconfiguration of the VM based on driver inputs follows
+
 	vm := obj.(*object.VirtualMachine)
+	spec := types.VirtualMachineConfigSpec{
+		NumCPUs:    int32(d.CPU),
+		MemoryMB:   int64(d.Memory),
+		VAppConfig: d.getVAppConfig(),
+	}
+
+	task, err := vm.Reconfigure(d.getCtx(), spec)
+	if err != nil {
+		return err
+	}
+
+	err = task.Wait(d.getCtx())
+	if err != nil {
+		return err
+	}
+
 	if err := d.resizeDisk(vm); err != nil {
 		return err
 	}
