@@ -848,9 +848,13 @@ func (d *Driver) createMachine() error {
 	if err := d.initCompute(); err != nil {
 		return err
 	}
-	if err := d.initBlockStorage(); err != nil {
-		return err
+
+	if d.requiresBlockStorage() {
+		if err := d.initBlockStorage(); err != nil {
+			return err
+		}
 	}
+
 	instanceID, err := d.client.CreateInstance(d)
 	if err != nil {
 		return err
@@ -986,6 +990,12 @@ func (d *Driver) privateSSHKeyPath() string {
 
 func (d *Driver) publicSSHKeyPath() string {
 	return d.GetSSHKeyPath() + ".pub"
+}
+
+// openstack deployments may not have cinder available
+// check to see if it's required before initializing
+func (d *Driver) requiresBlockStorage() bool {
+	return d.VolumeName != "" || d.VolumeId != "" || d.VolumeType != "" || d.BootFromVolume || d.VolumeSize > 0 || d.VolumeDevicePath != ""
 }
 
 func sanitizeKeyPairName(s *string) {
