@@ -22,10 +22,9 @@ if [ "$CROSS" = 1 ]; then
     echo Built ./bin/rancher-machine-$(uname -s)-$(uname -m)
 else
     CGO_ENABLED=0 go build -a -tags netgo -installsuffix netgo \
-        -ldflags \
-        "-X github.com/rancher/machine/version.Version=$VERSION
-         -X github.com/rancher/machine/version.GitCommit=$COMMIT
-         -extldflags '-static -s'" \
+        -ldflags "-w -s -extldflags '-static'
+         -X github.com/rancher/machine/version.Version=$VERSION
+         -X github.com/rancher/machine/version.GitCommit=$COMMIT" \
         -o ./bin/rancher-machine ./cmd/rancher-machine
     ./bin/rancher-machine --version
 fi
