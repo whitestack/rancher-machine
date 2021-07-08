@@ -2,6 +2,8 @@ package commands
 
 import (
 	"bytes"
+	"compress/gzip"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"flag"
@@ -481,6 +483,20 @@ func tlsPath(c CommandLine, flag string, defaultName string) string {
 	return filepath.Join(mcndirs.GetMachineCertDir(), defaultName)
 }
 
+func gzipEncode(data []byte) (string, error) {
+	var b bytes.Buffer
+	gz := gzip.NewWriter(&b)
+	gz.Flush()
+	if _, err := gz.Write(data); err != nil {
+		return "", err
+	}
+	if err := gz.Close(); err != nil {
+		return "", err
+	}
+	encoded := base64.RawStdEncoding.EncodeToString([]byte(b.Bytes()))
+	return encoded, nil
+}
+
 // If the user has provided a userdata file, then we add the customInstallScript to their userdata file.
 // This assumes that the user-provided userdata file start with a shebang or `#cloud-config`
 // If the user has not provided any userdata file, then we set the customInstallScript as the userdata file.
@@ -490,14 +506,7 @@ func updateUserdataFile(driverOpts *rpcdriver.RPCFlags, userdataFlag, customInst
 	userdataFile := driverOpts.String(userdataFlag)
 
 	if userdataFile == "" {
-		if !strings.HasSuffix(userdataFlag, "cloud-config") {
-			// If the userdata file is not set, then the customInstallScript file is set as the userdata file.
-			driverOpts.Values[userdataFlag] = customInstallScript
-			return nil
-		}
-
-		// Drivers like vmwarevsphere expect the userdata to be in cloud-config format.
-		// Setting userdataContent like this will coerce the custom script into cloud-config format.
+		// Always convert to cloud config if user data is not provided
 		userdataContent = []byte("#cloud-config")
 	} else {
 		userdataContent, err = ioutil.ReadFile(userdataFile)
@@ -528,17 +537,60 @@ func updateUserdataFile(driverOpts *rpcdriver.RPCFlags, userdataFlag, customInst
 	return nil
 }
 
+func writeCloudConfig(encodedData string, cf map[interface{}]interface{}, newUserDataFile *os.File) error {
+
+	// Add to the write_files directive
+	writeFile := map[string]string{
+		"encoding":    "gzip+b64",
+		"content":     fmt.Sprintf("%s", encodedData),
+		"path":        "/usr/local/custom_script/install.sh",
+		"permissions": "0644",
+	}
+	if err := addToCloudConfig(cf, "write_files", writeFile); err != nil {
+		return err
+	}
+
+	// Add to the runmd directive
+	if err := addToCloudConfig(cf, "runcmd", fmt.Sprintf("sh %s", writeFile["path"])); err != nil {
+		return err
+	}
+
+	userdataContent, err := yaml.Marshal(cf)
+	if err != nil {
+		return err
+	}
+
+	userdataContent = append([]byte("#cloud-config\n"), userdataContent...)
+	_, err = newUserDataFile.Write(userdataContent)
+	if err != nil {
+		return err
+	}
+
+	log.Debugf("Modified userdata file contents: %+v", string(userdataContent))
+
+	return nil
+}
+
 // replaceUserdataFile adds the customScriptContent to the user-provided userdata file and creates a new
 // temp file for this content.
-// If the user-provided userdata file starts with a shebang, then we can add the customScriptContent to this file.
+// If the user-provided userdata file starts with a shebang, then we can add it to the customScriptContent and add data to the `runcmd` directive.
 // fi the user-provided userdata file is in cloud-config format, then we add the customScriptContent to the `runcmd` directive.
 func replaceUserdataFile(userdataContent, customScriptContent []byte, newUserDataFile *os.File) error {
 	switch {
 	case bytes.HasPrefix(userdataContent, []byte("#!")):
-		// The user provided a script file, so the customInstallScript contents is appended to this file
-		// and written to a new file.
-		_, err := newUserDataFile.Write(bytes.Join([][]byte{userdataContent, customScriptContent}, []byte("\n\n")))
+		// The user provided a script file, so the customInstallScript contents is appended to user script
+		// and added to the "runcmd" section so modified user data is always in cloud config format.
+
+		// Remove the shebang
+		userdataContent = regexp.MustCompile(`^#!.*\n`).ReplaceAll(userdataContent, nil)
+
+		cf := make(map[interface{}]interface{})
+		encodedData, err := gzipEncode(bytes.Join([][]byte{userdataContent, customScriptContent}, []byte("\n\n")))
 		if err != nil {
+			return err
+		}
+
+		if err := writeCloudConfig(encodedData, cf, newUserDataFile); err != nil {
 			return err
 		}
 
@@ -550,30 +602,12 @@ func replaceUserdataFile(userdataContent, customScriptContent []byte, newUserDat
 			return err
 		}
 
-		// Add to the write_files directive
-		writeFile := map[string]string{
-			"content":     string(customScriptContent),
-			"path":        "/usr/local/custom_script/install.sh",
-			"permissions": "0644",
-		}
-		if err := addToCloudConfig(cf, "write_files", writeFile); err != nil {
-			return err
-		}
-
-		// Add to the runmd directive
-		if err := addToCloudConfig(cf, "runcmd", fmt.Sprintf("sh %s", writeFile["path"])); err != nil {
-			return err
-		}
-
-		userdataContent, err := yaml.Marshal(cf)
+		encodedCustomInstallScript, err := gzipEncode(customScriptContent)
 		if err != nil {
 			return err
 		}
-		log.Debugf("Modified userdata file contents: %+v", string(userdataContent))
 
-		userdataContent = append([]byte("#cloud-config\n"), userdataContent...)
-		_, err = newUserDataFile.Write(userdataContent)
-		if err != nil {
+		if err := writeCloudConfig(encodedCustomInstallScript, cf, newUserDataFile); err != nil {
 			return err
 		}
 
