@@ -46,7 +46,7 @@ func loadOrFindTenantID(ctx context.Context, env azure.Environment, subscription
 	// Handle cache miss
 	if tenantID == "" {
 		log.Debug("Making API call to find tenant ID")
-		t, err := findTenantID(ctx, env, subscriptionID)
+		t, err := FindTenantID(ctx, env, subscriptionID)
 		if err != nil {
 			return "", err
 		}
@@ -64,10 +64,10 @@ func loadOrFindTenantID(ctx context.Context, env azure.Environment, subscription
 	return tenantID, nil
 }
 
-// findTenantID figures out the AAD tenant ID of the subscription by making an
+// FindTenantID figures out the AAD tenant ID of the subscription by making an
 // unauthenticated request to the Get Subscription Details endpoint and parses
 // the value from WWW-Authenticate header.
-func findTenantID(ctx context.Context, env azure.Environment, subscriptionID string) (string, error) {
+func FindTenantID(ctx context.Context, env azure.Environment, subscriptionID string) (string, error) {
 	goCtx, cancel := context.WithTimeout(ctx, findTenantIDTimeout)
 	defer cancel()
 	const hdrKey = "WWW-Authenticate"
