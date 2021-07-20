@@ -541,7 +541,7 @@ func (a AzureClient) removeOSDiskBlob(ctx context.Context, resourceGroup, vmName
 		log.Debugf("Did not find container in storage account")
 	}
 
-	lcrp, err := blobContainersClient.List(ctx, resourceGroup, storageAccount, "", "")
+	lcrp, err := blobContainersClient.List(ctx, resourceGroup, storageAccount, "", "", "")
 	if err != nil {
 		return err
 	}

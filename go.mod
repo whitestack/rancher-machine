@@ -8,9 +8,9 @@ replace (
 )
 
 require (
-	github.com/Azure/azure-sdk-for-go v41.2.0+incompatible
-	github.com/Azure/go-autorest/autorest v0.11.12
-	github.com/Azure/go-autorest/autorest/adal v0.9.5
+	github.com/Azure/azure-sdk-for-go v55.7.0+incompatible
+	github.com/Azure/go-autorest/autorest v0.11.19
+	github.com/Azure/go-autorest/autorest/adal v0.9.14
 	github.com/Azure/go-autorest/autorest/azure/auth v0.4.2
 	github.com/Azure/go-autorest/autorest/to v0.3.0
 	github.com/Azure/go-autorest/autorest/validation v0.2.0 // indirect
@@ -25,6 +25,7 @@ require (
 	github.com/diskfs/go-diskfs v0.0.0-20191115120903-6cf046d472d7
 	github.com/docker/docker v0.7.3-0.20190327010347-be7ac8be2ae0
 	github.com/exoscale/egoscale v0.12.3
+	github.com/form3tech-oss/jwt-go v3.2.3+incompatible // indirect
 	github.com/google/go-querystring v0.0.0-20140804062624-30f7a39f4a21 // indirect
 	github.com/google/gofuzz v1.2.0 // indirect
 	github.com/gophercloud/gophercloud v0.7.0
@@ -44,7 +45,7 @@ require (
 	golang.org/x/crypto v0.0.0-20210322153248-0c34fe9e7dc2
 	golang.org/x/net v0.0.0-20210226172049-e18ecbb05110
 	golang.org/x/oauth2 v0.0.0-20200107190931-bf48bf16ab8d
-	golang.org/x/sys v0.0.0-20210225134936-a50acf3fe073
+	golang.org/x/sys v0.0.0-20210615035016-665e8c7367d1
 	google.golang.org/api v0.20.0
 	gopkg.in/yaml.v2 v2.4.0
 	k8s.io/api v0.21.0
