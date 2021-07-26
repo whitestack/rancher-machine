@@ -493,7 +493,7 @@ func gzipEncode(data []byte) (string, error) {
 	if err := gz.Close(); err != nil {
 		return "", err
 	}
-	encoded := base64.RawStdEncoding.EncodeToString([]byte(b.Bytes()))
+	encoded := base64.StdEncoding.EncodeToString([]byte(b.Bytes()))
 	return encoded, nil
 }
 
