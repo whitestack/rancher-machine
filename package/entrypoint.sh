@@ -12,7 +12,15 @@ for i; do
       driver_hash=${i##--driver-hash=}
     ;;
     *)
-      set -- "$@" "$i"
+      # Breaking up arguments that are passed to rancher-machine allows for handling values with spaces.
+      flag=${i%%=*}
+      value=${i#--*=}
+      if [ "$flag" = "$value" ]; then
+        # If flag and value are the same, then the argument that was passed doesn't have an equal-sign and can be passed as-is.
+        set -- "$@" "$flag"
+      else
+        set -- "$@" "$flag" "$value"
+      fi
     ;;
   esac
 done
@@ -28,4 +36,4 @@ if [ -n "$driver_url" ]; then
   fi
 fi
 
-{ { { { rancher-machine $@ 2>&1; echo $? >&3; } | tee -a $termination_log >&4; } 3>&1; } | { read xs; exit $xs; } } 4>&1
+{ { { { rancher-machine "$@" 2>&1; echo $? >&3; } | tee -a $termination_log >&4; } 3>&1; } | { read xs; exit $xs; } } 4>&1
