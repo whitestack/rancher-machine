@@ -27,7 +27,10 @@ func WithCustomScript(provisioner Provisioner, customScriptPath string) error {
 		return fmt.Errorf("unable to read file %s: %v", customScriptPath, err)
 	}
 
-	if output, err := provisioner.SSHCommand(fmt.Sprintf("echo \"%v\" | sh -", string(customScriptContents))); err != nil {
+	if output, err := provisioner.SSHCommand(fmt.Sprintf("cat <<'OEOF' >/tmp/install_script.sh\n%s\nOEOF", string(customScriptContents))); err != nil {
+		return fmt.Errorf("error uploading custom script: output: %s, error: %s", output, err)
+	}
+	if output, err := provisioner.SSHCommand("sh /tmp/install_script.sh"); err != nil {
 		return fmt.Errorf("error running custom script: output: %s, error: %s", output, err)
 	}
 
