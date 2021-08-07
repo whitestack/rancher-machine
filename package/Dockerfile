@@ -1,7 +1,7 @@
 FROM registry.access.redhat.com/ubi8/ubi-minimal:latest
 
 RUN microdnf update -y && \
-    microdnf install unzip file tar gzip && \
+    microdnf install unzip file tar gzip openssh-clients && \
     rm -rf /var/cache/yum
 
 WORKDIR /root
