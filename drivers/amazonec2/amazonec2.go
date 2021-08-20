@@ -63,6 +63,7 @@ var (
 	etcdPorts                            = []int64{2379, 2380}
 	clusterManagerPorts                  = []int64{6443, 6443}
 	vxlanPorts                           = []int64{4789, 4789}
+	typhaPorts                           = []int64{5473, 5473}
 	flannelPorts                         = []int64{8472, 8472}
 	otherKubePorts                       = []int64{10250, 10252}
 	kubeProxyPorts                       = []int64{10256, 10256}
@@ -1348,6 +1349,20 @@ func (d *Driver) configureSecurityGroupPermissions(group *ec2.SecurityGroup) ([]
 				IpProtocol: aws.String("udp"),
 				FromPort:   aws.Int64(int64(vxlanPorts[0])),
 				ToPort:     aws.Int64(int64(vxlanPorts[1])),
+				UserIdGroupPairs: []*ec2.UserIdGroupPair{
+					{
+						GroupId: group.GroupId,
+					},
+				},
+			})
+		}
+
+		// typha
+		if !hasPortsInbound[fmt.Sprintf("%d/tcp", typhaPorts[0])] {
+			inboundPerms = append(inboundPerms, &ec2.IpPermission{
+				IpProtocol: aws.String("tcp"),
+				FromPort:   aws.Int64(typhaPorts[0]),
+				ToPort:     aws.Int64(typhaPorts[1]),
 				UserIdGroupPairs: []*ec2.UserIdGroupPair{
 					{
 						GroupId: group.GroupId,
