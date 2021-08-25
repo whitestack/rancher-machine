@@ -4,7 +4,7 @@ RUN microdnf update -y && \
     microdnf install unzip file tar gzip openssh-clients && \
     rm -rf /var/cache/yum
 
-WORKDIR /root
+RUN useradd -u 1000 machine
 
 RUN mkdir -p .docker/machine/machines
 
@@ -21,5 +21,9 @@ RUN download_driver.sh "https://github.com/packethost/docker-machine-driver-pack
 RUN download_driver.sh "https://github.com/phoenixnap/docker-machine-driver-pnap/releases/download/v0.1.0/docker-machine-driver-pnap_0.1.0_linux_amd64.zip" "5f25a7fbcaca0710b7290216464ca8433fa3d683b59d5e4e674bef2d0a3ff6c7"
 
 COPY rancher-machine entrypoint.sh /usr/local/bin/
+RUN chmod 0777 /usr/local/bin
+
+USER 1000
+WORKDIR /home/machine
 
 ENTRYPOINT ["entrypoint.sh"]
