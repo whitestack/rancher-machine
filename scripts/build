@@ -12,6 +12,7 @@ if [ "$CROSS" = 1 ]; then
     CGO_ENABLED=0 GOOS=windows go build -ldflags "-X main.VERSION=$VERSION" -o ./bin/rancher-machine-Windows-x86_64.exe ./cmd/rancher-machine
     CGO_ENABLED=0 GOARCH=arm64 go build -a -tags netgo -installsuffix netgo -ldflags "-X main.VERSION=$VERSION" -o ./bin/rancher-machine-Linux-arm64 ./cmd/rancher-machine
     CGO_ENABLED=0 GOARCH=ppc64le go build -a -tags netgo -installsuffix netgo -ldflags "-X main.VERSION=$VERSION" -o ./bin/rancher-machine-Linux-ppc64le ./cmd/rancher-machine
+    CGO_ENABLED=0 GOARCH=s390x go build -a -tags netgo -installsuffix netgo -ldflags "-X main.VERSION=$VERSION" -o ./bin/rancher-machine-Linux-s390x ./cmd/rancher-machine
     CGO_ENABLED=0 GOARCH=arm GOARM=6 go build -a -tags netgo -installsuffix netgo -ldflags "-X main.VERSION=$VERSION" -o ./bin/rancher-machine-Linux-arm ./cmd/rancher-machine
     CGO_ENABLED=0 GOARCH=arm GOARM=6 go build -a -tags netgo -installsuffix netgo -ldflags "-X main.VERSION=$VERSION" -o ./bin/rancher-machine-Linux-armv6l ./cmd/rancher-machine
     CGO_ENABLED=0 GOARCH=arm GOARM=7 go build -a -tags netgo -installsuffix netgo -ldflags "-X main.VERSION=$VERSION" -o ./bin/rancher-machine-Linux-armv7l ./cmd/rancher-machine
