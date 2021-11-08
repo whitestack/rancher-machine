@@ -152,8 +152,7 @@ func cmdCreateInner(c CommandLine, api libmachine.API) error {
 		return errNoMachineName
 	}
 
-	validName := host.ValidateHostName(name)
-	if !validName {
+	if !host.ValidateHostName(name) {
 		return fmt.Errorf("Error creating machine: %s", mcnerror.ErrInvalidHostname)
 	}
 
@@ -238,7 +237,7 @@ func cmdCreateInner(c CommandLine, api libmachine.API) error {
 		h.HostOptions.SwarmOptions = nil
 
 		if userdataFlag != "" {
-			err = updateUserdataFile(driverOpts, userdataFlag, customInstallScript)
+			err = updateUserdataFile(driverOpts, name, userdataFlag, customInstallScript)
 			if err != nil {
 				return fmt.Errorf("could not alter cloud-init file: %v", err)
 			}
@@ -493,14 +492,14 @@ func gzipEncode(data []byte) (string, error) {
 	if err := gz.Close(); err != nil {
 		return "", err
 	}
-	encoded := base64.StdEncoding.EncodeToString([]byte(b.Bytes()))
+	encoded := base64.StdEncoding.EncodeToString(b.Bytes())
 	return encoded, nil
 }
 
 // If the user has provided a userdata file, then we add the customInstallScript to their userdata file.
 // This assumes that the user-provided userdata file start with a shebang or `#cloud-config`
 // If the user has not provided any userdata file, then we set the customInstallScript as the userdata file.
-func updateUserdataFile(driverOpts *rpcdriver.RPCFlags, userdataFlag, customInstallScript string) error {
+func updateUserdataFile(driverOpts *rpcdriver.RPCFlags, machineName, userdataFlag, customInstallScript string) error {
 	var userdataContent []byte
 	var err error
 	userdataFile := driverOpts.String(userdataFlag)
@@ -528,7 +527,7 @@ func updateUserdataFile(driverOpts *rpcdriver.RPCFlags, userdataFlag, customInst
 	}
 	defer modifiedUserdataFile.Close()
 
-	if err := replaceUserdataFile(userdataContent, customScriptContent, modifiedUserdataFile); err != nil {
+	if err := replaceUserdataFile(machineName, userdataContent, customScriptContent, modifiedUserdataFile); err != nil {
 		return err
 	}
 
@@ -537,8 +536,7 @@ func updateUserdataFile(driverOpts *rpcdriver.RPCFlags, userdataFlag, customInst
 	return nil
 }
 
-func writeCloudConfig(encodedData string, cf map[interface{}]interface{}, newUserDataFile *os.File) error {
-
+func writeCloudConfig(machineName, encodedData string, cf map[interface{}]interface{}, newUserDataFile *os.File) error {
 	// Add to the write_files directive
 	writeFile := map[string]string{
 		"encoding":    "gzip+b64",
@@ -553,6 +551,11 @@ func writeCloudConfig(encodedData string, cf map[interface{}]interface{}, newUse
 	// Add to the runmd directive
 	if err := addToCloudConfig(cf, "runcmd", fmt.Sprintf("sh %s", writeFile["path"])); err != nil {
 		return err
+	}
+
+	// Add the hostname
+	if _, ok := cf["hostname"]; !ok {
+		cf["hostname"] = machineName
 	}
 
 	userdataContent, err := yaml.Marshal(cf)
@@ -575,7 +578,11 @@ func writeCloudConfig(encodedData string, cf map[interface{}]interface{}, newUse
 // temp file for this content.
 // If the user-provided userdata file starts with a shebang, then we can add it to the customScriptContent and add data to the `runcmd` directive.
 // fi the user-provided userdata file is in cloud-config format, then we add the customScriptContent to the `runcmd` directive.
-func replaceUserdataFile(userdataContent, customScriptContent []byte, newUserDataFile *os.File) error {
+func replaceUserdataFile(machineName string, userdataContent, customScriptContent []byte, newUserDataFile *os.File) error {
+	var err error
+	var encodedData string
+	cf := make(map[interface{}]interface{})
+
 	switch {
 	case bytes.HasPrefix(userdataContent, []byte("#!")):
 		// The user provided a script file, so the customInstallScript contents is appended to user script
@@ -584,30 +591,20 @@ func replaceUserdataFile(userdataContent, customScriptContent []byte, newUserDat
 		// Remove the shebang
 		userdataContent = regexp.MustCompile(`^#!.*\n`).ReplaceAll(userdataContent, nil)
 
-		cf := make(map[interface{}]interface{})
-		encodedData, err := gzipEncode(bytes.Join([][]byte{userdataContent, customScriptContent}, []byte("\n\n")))
+		encodedData, err = gzipEncode(bytes.Join([][]byte{userdataContent, customScriptContent}, []byte("\n\n")))
 		if err != nil {
-			return err
-		}
-
-		if err := writeCloudConfig(encodedData, cf, newUserDataFile); err != nil {
 			return err
 		}
 
 	case bytes.HasPrefix(userdataContent, []byte("#cloud-config")):
 		// The user provided a cloud-config file, so the customInstallScript context is added to the
 		// "runcmd" section of the YAML.
-		cf := make(map[interface{}]interface{})
 		if err := yaml.Unmarshal(userdataContent, &cf); err != nil {
 			return err
 		}
 
-		encodedCustomInstallScript, err := gzipEncode(customScriptContent)
+		encodedData, err = gzipEncode(customScriptContent)
 		if err != nil {
-			return err
-		}
-
-		if err := writeCloudConfig(encodedCustomInstallScript, cf, newUserDataFile); err != nil {
 			return err
 		}
 
@@ -615,7 +612,7 @@ func replaceUserdataFile(userdataContent, customScriptContent []byte, newUserDat
 		return fmt.Errorf("existing userdata file does not begin with '#!' or '#cloud-config'")
 	}
 
-	return nil
+	return writeCloudConfig(machineName, encodedData, cf, newUserDataFile)
 }
 
 func addToCloudConfig(cf map[interface{}]interface{}, key string, value interface{}) error {
