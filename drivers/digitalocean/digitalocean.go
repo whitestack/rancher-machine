@@ -377,7 +377,7 @@ func (d *Driver) Kill() error {
 
 func (d *Driver) Remove() error {
 	client := d.getClient()
-	if d.SSHKeyFingerprint == "" {
+	if d.SSHKeyFingerprint == "" && d.SSHKeyID != 0 {
 		if resp, err := client.Keys.DeleteByID(context.TODO(), d.SSHKeyID); err != nil {
 			if resp.StatusCode == 404 {
 				log.Infof("Digital Ocean SSH key doesn't exist, assuming it is already deleted")
@@ -387,9 +387,10 @@ func (d *Driver) Remove() error {
 		}
 	}
 	if resp, err := client.Droplets.Delete(context.TODO(), d.DropletID); err != nil {
-		if resp.StatusCode == 404 {
+		if resp != nil && resp.StatusCode == 404 {
 			log.Infof("Digital Ocean droplet doesn't exist, assuming it is already deleted")
 		} else {
+			log.Errorf("ERROR: %v", err)
 			return err
 		}
 	}
