@@ -187,6 +187,9 @@ steps:
 
   - name: docker-publish
     image: rancher/drone-images:docker-s390x
+    volumes:
+      - name: docker
+        path: /var/run/docker.sock
     settings:
       purge: false
       context: package/
