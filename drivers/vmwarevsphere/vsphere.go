@@ -72,15 +72,15 @@ type Driver struct {
 	CloneFrom              string
 	SSHPassword            string
 	SSHUserGroup           string
-
-	vms          map[string]*object.VirtualMachine
-	soap         *govmomi.Client
-	ctx          context.Context
-	finder       *find.Finder
-	datacenter   *object.Datacenter
-	networks     map[string]object.NetworkReference
-	hostsystem   *object.HostSystem
-	resourcepool *object.ResourcePool
+	OS                     string
+	vms                    map[string]*object.VirtualMachine
+	soap                   *govmomi.Client
+	ctx                    context.Context
+	finder                 *find.Finder
+	datacenter             *object.Datacenter
+	networks               map[string]object.NetworkReference
+	hostsystem             *object.HostSystem
+	resourcepool           *object.ResourcePool
 }
 
 const (
@@ -92,6 +92,8 @@ const (
 	defaultMemory       = 2048
 	defaultDiskSize     = 20480
 	defaultSDKPort      = 443
+	defaultMachineOS    = "linux"
+	WindowsMachineOS    = "windows"
 
 	creationTypeVM      = "vm"
 	creationTypeTmpl    = "template"

@@ -120,10 +120,26 @@ func DriverUserdataFlag(d Driver) string {
 	return ""
 }
 
+// DriverOSFlag returns true if the driver is detected to have an OS flag.
+func DriverOSFlag(d Driver) string {
+	for _, opt := range d.GetCreateFlags() {
+		if nameIsOS(opt.String()) {
+			return opt.String()
+		}
+	}
+
+	return ""
+}
+
 // nameIsUserData returns true if the given flag is a userdata flag
 func nameIsUserData(name string) bool {
 	return strings.Contains(name, "user-data") ||
 		strings.Contains(name, "userdata") ||
 		strings.Contains(name, "custom-data") ||
 		strings.Contains(name, "cloud-config")
+}
+
+// nameIsOS returns true if the given flag is an OS flag
+func nameIsOS(name string) bool {
+	return strings.HasSuffix(name, "-os")
 }

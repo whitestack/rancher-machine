@@ -128,6 +128,8 @@ func (d *Driver) addNetworks(vm *object.VirtualMachine, networks map[string]obje
 	return nil
 }
 
+// provisionVm provisions a legacy VM
+// legacy Windows VMs are not supported
 func (d *Driver) provisionVm(vm *object.VirtualMachine) error {
 	log.Infof("Provisioning certs and ssh keys...")
 
@@ -157,6 +159,10 @@ func (d *Driver) provisionVm(vm *object.VirtualMachine) error {
 	auth := NewAuthFlag(d.SSHUser, d.SSHPassword)
 	flag := FileAttrFlag{}
 	flag.SetPerms(0, 0, 660)
+
+	if d.OS != defaultMachineOS {
+		return fmt.Errorf("provisionVm: Machine OS [%s] is not supported for Legacy VMs", d.OS)
+	}
 
 	tmpDir, err := fileman.CreateTemporaryDirectory(d.getCtx(), auth.Auth(), "docker_", "", "/tmp")
 	if err != nil {
@@ -195,7 +201,6 @@ func (d *Driver) provisionVm(vm *object.VirtualMachine) error {
 			return err
 		}
 	}
-
 	return nil
 }
 
@@ -216,7 +221,6 @@ func (d *Driver) addConfigParams(vm *object.VirtualMachine) error {
 			})
 		}
 	}
-
 	return d.applyOpts(vm, opts)
 }
 
@@ -224,7 +228,6 @@ func (d *Driver) applyOpts(vm *object.VirtualMachine, opts []types.BaseOptionVal
 	if len(opts) == 0 {
 		return nil
 	}
-
 	task, err := vm.Reconfigure(d.getCtx(), types.VirtualMachineConfigSpec{
 		ExtraConfig: opts,
 	})
@@ -260,7 +263,6 @@ func (d *Driver) addTags(vm *object.VirtualMachine) error {
 
 		tagsManager.AttachTag(d.getCtx(), tag.ID, vm)
 	}
-
 	return nil
 }
 
@@ -290,7 +292,6 @@ func (d *Driver) addCustomAttributes(vm *object.VirtualMachine) error {
 			return err
 		}
 	}
-
 	return nil
 }
 

@@ -135,4 +135,3 @@ func (provisioner *FedoraCoreOSProvisioner) Provision(swarmOptions swarm.Options
 	err := configureSwarm(provisioner, swarmOptions, provisioner.AuthOptions)
 	return err
 }
-

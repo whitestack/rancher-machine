@@ -133,7 +133,7 @@ func (d *Driver) createCloudInitIso() error {
 		return err
 	}
 
-	userdatacontent, err := addSSHUserToYaml(d.CloudConfig, d.SSHUser, d.SSHUserGroup, string(sshkey))
+	userdatacontent, err := d.addSSHUserToYaml(string(sshkey))
 	if err != nil {
 		return err
 	}
@@ -228,35 +228,56 @@ func (d *Driver) mountCloudInitIso(vm *object.VirtualMachine, dc *object.Datacen
 	return vm.AddDevice(d.getCtx(), add...)
 }
 
-func addSSHUserToYaml(yamlcontent, user, group, sshkey string) (string, error) {
+// addSSHUserToYaml parses user, group, and sshkey params that are passed in
+// and appends them to the existing cloud-config (cloudInit) userdata file
+// there is OS specific logic for linux and windows
+// Windows leverages cloudbase-init as cloudinit is unsupported on Windows
+// https://cloudbase-init.readthedocs.io/en/latest/
+func (d *Driver) addSSHUserToYaml(sshkey string) (string, error) {
+	var (
+		sshUser     = d.SSHUser
+		group       = d.SSHUserGroup
+		yamlcontent = d.CloudConfig
+	)
 	cf := make(map[interface{}]interface{})
 	if err := yaml.Unmarshal([]byte(yamlcontent), &cf); err != nil {
 		return "", err
 	}
 
-	// implements https://github.com/canonical/cloud-init/blob/master/cloudinit/config/cc_users_groups.py#L28-L71
-	newUser := map[interface{}]interface{}{
-		"name":        user,
-		"sudo":        "ALL=(ALL) NOPASSWD:ALL",
+	commonUser := map[interface{}]interface{}{
+		"name":        sshUser,
 		"lock_passwd": true,
 		"groups":      group,
-
-		// technically not in the spec, see this code for context
-		// https://github.com/canonical/cloud-init/blob/master/cloudinit/distros/__init__.py#L394-L397
-		"create_groups": false,
-
-		"no_user_group": true,
 		"ssh_authorized_keys": []string{
 			sshkey,
 		},
 	}
 
+	switch d.OS {
+	default:
+		log.Debug("Adding linux ssh user to cloud-init")
+		// implements https://github.com/canonical/cloud-init/blob/master/cloudinit/config/cc_users_groups.py#L28-L71
+		// technically not in the spec, see this code for context
+		// https://github.com/canonical/cloud-init/blob/master/cloudinit/distros/__init__.py#L394-L397
+		commonUser["sudo"] = "ALL=(ALL) NOPASSWD:ALL"
+		commonUser["create_groups"] = false
+		commonUser["no_user_group"] = true
+
+	// Administrator is the default ssh user on Windows Server 2019/2022
+	// This implements cloudbase-init for Windows VMs as cloudinit doesn't support Windows
+	// https://cloudbase-init.readthedocs.io/en/latest/
+	// On Windows, primary_group and groups are concatenated.
+	case WindowsMachineOS:
+		log.Debug("Adding windows ssh user to cloud-init")
+		commonUser["inactive"] = false
+	}
+
 	if val, ok := cf["users"]; ok {
 		u := val.([]interface{})
-		cf["users"] = append(u, newUser)
+		cf["users"] = append(u, commonUser)
 	} else {
 		users := make([]interface{}, 1)
-		users[0] = newUser
+		users[0] = commonUser
 		cf["users"] = users
 	}
 
@@ -281,6 +302,5 @@ func addSSHUserToYaml(yamlcontent, user, group, sshkey string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-
 	return string(yaml), nil
 }
