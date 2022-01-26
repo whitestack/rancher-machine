@@ -10,6 +10,8 @@ import (
 	"io/ioutil"
 	"math/big"
 	"net"
+	"net/http"
+	"net/url"
 	"os"
 	"time"
 
@@ -17,6 +19,7 @@ import (
 
 	"github.com/rancher/machine/libmachine/auth"
 	"github.com/rancher/machine/libmachine/log"
+	"github.com/rancher/machine/libmachine/util"
 )
 
 var defaultGenerator = NewX509CertGenerator()
@@ -259,15 +262,27 @@ func (xcg *X509CertGenerator) ValidateCertificate(addr string, authOptions *auth
 		return false, err
 	}
 
-	dialer := &net.Dialer{
-		Timeout: time.Second * 20,
+	transport := http.Transport{
+		TLSClientConfig: tlsConfig,
 	}
 
-	_, err = tls.DialWithDialer(dialer, "tcp", addr, tlsConfig)
+	envVar := util.GetProxyURL()
+	if envVar != "" {
+		log.Debugf("proxy address is used: %s", envVar)
+		url, err := url.Parse("http://" + envVar)
+		if err != nil {
+			return false, err
+		}
+		transport.Proxy = http.ProxyURL(url)
+	}
+	client := http.Client{
+		Transport: &transport,
+		Timeout:   time.Second * 20,
+	}
+	_, err = client.Get("https://" + addr + "/version")
 	if err != nil {
 		return false, err
 	}
-
 	return true, nil
 }
 

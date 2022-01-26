@@ -14,6 +14,7 @@ import (
 	"github.com/docker/docker/pkg/term"
 	"github.com/rancher/machine/libmachine/log"
 	"github.com/rancher/machine/libmachine/mcnutils"
+	"github.com/rancher/machine/libmachine/util"
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/crypto/ssh/terminal"
 )
@@ -61,8 +62,9 @@ const (
 )
 
 const (
-	External ClientType = "external"
-	Native   ClientType = "native"
+	External    ClientType = "external"
+	Native      ClientType = "native"
+	SSHProxyArg string     = "ProxyCommand='%s -X connect -x %s %%h %%p'"
 )
 
 var (
@@ -337,7 +339,15 @@ func NewExternalClient(sshBinaryPath, user, host string, port int, auth *Auth) (
 		BinaryPath: sshBinaryPath,
 	}
 
-	args := append(baseSSHArgs, fmt.Sprintf("%s@%s", user, host))
+	var args []string
+	envVar := util.GetProxyURL()
+	ncBinaryPath, _ := exec.LookPath("nc")
+	log.Debugf("envVar: %s; ncBinaryPath: %s", envVar, ncBinaryPath)
+	if envVar != "" && ncBinaryPath != "" {
+		args = append(baseSSHArgs, "-o", fmt.Sprintf(SSHProxyArg, ncBinaryPath, envVar), fmt.Sprintf("%s@%s", user, host))
+	} else {
+		args = append(baseSSHArgs, fmt.Sprintf("%s@%s", user, host))
+	}
 
 	// If no identities are explicitly provided, also look at the identities
 	// offered by ssh-agent
@@ -379,6 +389,13 @@ func NewExternalClient(sshBinaryPath, user, host string, port int, auth *Auth) (
 }
 
 func getSSHCmd(binaryPath string, args ...string) *exec.Cmd {
+	// remove the quote to avoid parsing errors
+	for i, arg := range args {
+		if strings.HasPrefix(arg, "ProxyCommand='") {
+			args[i] = strings.ReplaceAll(arg, "'", "")
+			break
+		}
+	}
 	return exec.Command(binaryPath, args...)
 }
 
