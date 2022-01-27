@@ -1,6 +1,6 @@
 module github.com/rancher/machine
 
-go 1.15
+go 1.17
 
 replace (
 	github.com/docker/docker => github.com/moby/moby v1.4.2-0.20170731201646-1009e6a40b29
@@ -16,8 +16,7 @@ require (
 	github.com/Azure/go-autorest/autorest/validation v0.2.0 // indirect
 	github.com/aws/aws-sdk-go v1.33.14
 	github.com/bitly/go-simplejson v0.5.0 // indirect
-	github.com/bmizerany/assert v0.0.0-20160611221934-b7ed37b82869 // indirect
-	github.com/bugsnag/bugsnag-go v0.0.0-20151120182711-02e952891c52
+	github.com/bugsnag/bugsnag-go v2.1.2+incompatible
 	github.com/bugsnag/osext v0.0.0-20130617224835-0dd3f918b21b // indirect
 	github.com/bugsnag/panicwrap v0.0.0-20160118154447-aceac81c6e2f // indirect
 	github.com/cenkalti/backoff v0.0.0-20141124221459-9831e1e25c87 // indirect
@@ -26,13 +25,14 @@ require (
 	github.com/docker/docker v0.7.3-0.20190327010347-be7ac8be2ae0
 	github.com/exoscale/egoscale v0.12.3
 	github.com/form3tech-oss/jwt-go v3.2.3+incompatible // indirect
+	github.com/gofrs/uuid v4.2.0+incompatible // indirect
 	github.com/google/go-querystring v0.0.0-20140804062624-30f7a39f4a21 // indirect
 	github.com/google/gofuzz v1.2.0 // indirect
 	github.com/gophercloud/gophercloud v0.7.0
 	github.com/gophercloud/utils v0.0.0-20191129022341-463e26ffa30d
 	github.com/gorilla/mux v1.7.3 // indirect
 	github.com/imdario/mergo v0.3.11 // indirect
-	github.com/juju/loggo v0.0.0-20190526231331-6e530bcce5d8 // indirect
+	github.com/kardianos/osext v0.0.0-20190222173326-2bc1f35cddc0 // indirect
 	github.com/rackspace/gophercloud v0.0.0-20150408191457-ce0f487f6747
 	github.com/rancher/wrangler v0.8.1-0.20210506052526-673b7f8692d9
 	github.com/samalba/dockerclient v0.0.0-20151231000007-f661dd4754aa
