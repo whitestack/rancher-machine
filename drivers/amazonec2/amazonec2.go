@@ -1276,37 +1276,37 @@ func (d *Driver) configureSecurityGroupPermissions(group *ec2.SecurityGroup) ([]
 		log.Debug("Skipping permission configuration on security groups")
 		return nil, nil
 	}
-	hasPortsInbound := make(map[string]bool)
+	hasPortsInbound := make(map[string]struct{})
 	for _, p := range group.IpPermissions {
 		if p.FromPort != nil {
-			hasPortsInbound[fmt.Sprintf("%d/%s", *p.FromPort, *p.IpProtocol)] = true
+			hasPortsInbound[fmt.Sprintf("%d/%s", *p.FromPort, *p.IpProtocol)] = struct{}{}
 		}
 	}
 
 	inboundPerms := []*ec2.IpPermission{}
 
-	if !hasPortsInbound["22/tcp"] {
-		inboundPerms = append(inboundPerms, &ec2.IpPermission{
-			IpProtocol: aws.String("tcp"),
-			FromPort:   aws.Int64(22),
-			ToPort:     aws.Int64(22),
-			IpRanges:   []*ec2.IpRange{{CidrIp: aws.String(ipRange)}},
-		})
-	}
-
-	if !hasPortsInbound[fmt.Sprintf("%d/tcp", dockerPort)] {
-		inboundPerms = append(inboundPerms, &ec2.IpPermission{
-			IpProtocol: aws.String("tcp"),
-			FromPort:   aws.Int64(int64(dockerPort)),
-			ToPort:     aws.Int64(int64(dockerPort)),
-			IpRanges:   []*ec2.IpRange{{CidrIp: aws.String(ipRange)}},
-		})
-	}
-
-	// we are only adding custom ports when the group is rancher-nodes
+	// we are only adding ports when the group is rancher-nodes
 	if *group.GroupName == defaultSecurityGroup && hasTagKey(group.Tags, machineSecurityGroupName) {
+		if _, ok := hasPortsInbound["22/tcp"]; !ok {
+			inboundPerms = append(inboundPerms, &ec2.IpPermission{
+				IpProtocol: aws.String("tcp"),
+				FromPort:   aws.Int64(22),
+				ToPort:     aws.Int64(22),
+				IpRanges:   []*ec2.IpRange{{CidrIp: aws.String(ipRange)}},
+			})
+		}
+
+		if _, ok := hasPortsInbound[fmt.Sprintf("%d/tcp", dockerPort)]; !ok {
+			inboundPerms = append(inboundPerms, &ec2.IpPermission{
+				IpProtocol: aws.String("tcp"),
+				FromPort:   aws.Int64(int64(dockerPort)),
+				ToPort:     aws.Int64(int64(dockerPort)),
+				IpRanges:   []*ec2.IpRange{{CidrIp: aws.String(ipRange)}},
+			})
+		}
+
 		// kubeapi
-		if !hasPortsInbound[fmt.Sprintf("%d/tcp", kubeApiPort)] {
+		if _, ok := hasPortsInbound[fmt.Sprintf("%d/tcp", kubeApiPort)]; !ok {
 			inboundPerms = append(inboundPerms, &ec2.IpPermission{
 				IpProtocol: aws.String("tcp"),
 				FromPort:   aws.Int64(int64(kubeApiPort)),
@@ -1316,7 +1316,7 @@ func (d *Driver) configureSecurityGroupPermissions(group *ec2.SecurityGroup) ([]
 		}
 
 		// rke2 supervisor
-		if !hasPortsInbound[fmt.Sprintf("%d/tcp", supervisorPort)] {
+		if _, ok := hasPortsInbound[fmt.Sprintf("%d/tcp", supervisorPort)]; !ok {
 			inboundPerms = append(inboundPerms, &ec2.IpPermission{
 				IpProtocol: aws.String("tcp"),
 				FromPort:   aws.Int64(int64(supervisorPort)),
@@ -1330,7 +1330,7 @@ func (d *Driver) configureSecurityGroupPermissions(group *ec2.SecurityGroup) ([]
 		}
 
 		// etcd
-		if !hasPortsInbound[fmt.Sprintf("%d/tcp", etcdPorts[0])] {
+		if _, ok := hasPortsInbound[fmt.Sprintf("%d/tcp", etcdPorts[0])]; !ok {
 			inboundPerms = append(inboundPerms, &ec2.IpPermission{
 				IpProtocol: aws.String("tcp"),
 				FromPort:   aws.Int64(int64(etcdPorts[0])),
@@ -1344,7 +1344,7 @@ func (d *Driver) configureSecurityGroupPermissions(group *ec2.SecurityGroup) ([]
 		}
 
 		// vxlan
-		if !hasPortsInbound[fmt.Sprintf("%d/udp", vxlanPorts[0])] {
+		if _, ok := hasPortsInbound[fmt.Sprintf("%d/udp", vxlanPorts[0])]; !ok {
 			inboundPerms = append(inboundPerms, &ec2.IpPermission{
 				IpProtocol: aws.String("udp"),
 				FromPort:   aws.Int64(int64(vxlanPorts[0])),
@@ -1358,7 +1358,7 @@ func (d *Driver) configureSecurityGroupPermissions(group *ec2.SecurityGroup) ([]
 		}
 
 		// typha
-		if !hasPortsInbound[fmt.Sprintf("%d/tcp", typhaPorts[0])] {
+		if _, ok := hasPortsInbound[fmt.Sprintf("%d/tcp", typhaPorts[0])]; !ok {
 			inboundPerms = append(inboundPerms, &ec2.IpPermission{
 				IpProtocol: aws.String("tcp"),
 				FromPort:   aws.Int64(typhaPorts[0]),
@@ -1372,7 +1372,7 @@ func (d *Driver) configureSecurityGroupPermissions(group *ec2.SecurityGroup) ([]
 		}
 
 		// flannel
-		if !hasPortsInbound[fmt.Sprintf("%d/udp", flannelPorts[0])] {
+		if _, ok := hasPortsInbound[fmt.Sprintf("%d/udp", flannelPorts[0])]; !ok {
 			inboundPerms = append(inboundPerms, &ec2.IpPermission{
 				IpProtocol: aws.String("udp"),
 				FromPort:   aws.Int64(int64(flannelPorts[0])),
@@ -1386,7 +1386,7 @@ func (d *Driver) configureSecurityGroupPermissions(group *ec2.SecurityGroup) ([]
 		}
 
 		// others
-		if !hasPortsInbound[fmt.Sprintf("%d/tcp", otherKubePorts[0])] {
+		if _, ok := hasPortsInbound[fmt.Sprintf("%d/tcp", otherKubePorts[0])]; !ok {
 			inboundPerms = append(inboundPerms, &ec2.IpPermission{
 				IpProtocol: aws.String("tcp"),
 				FromPort:   aws.Int64(int64(otherKubePorts[0])),
@@ -1400,7 +1400,7 @@ func (d *Driver) configureSecurityGroupPermissions(group *ec2.SecurityGroup) ([]
 		}
 
 		// kube proxy
-		if !hasPortsInbound[fmt.Sprintf("%d/tcp", kubeProxyPorts[0])] {
+		if _, ok := hasPortsInbound[fmt.Sprintf("%d/tcp", kubeProxyPorts[0])]; !ok {
 			inboundPerms = append(inboundPerms, &ec2.IpPermission{
 				IpProtocol: aws.String("tcp"),
 				FromPort:   aws.Int64(int64(kubeProxyPorts[0])),
@@ -1414,7 +1414,7 @@ func (d *Driver) configureSecurityGroupPermissions(group *ec2.SecurityGroup) ([]
 		}
 
 		// node exporter
-		if !hasPortsInbound[fmt.Sprintf("%d/tcp", nodeExporter)] {
+		if _, ok := hasPortsInbound[fmt.Sprintf("%d/tcp", nodeExporter)]; !ok {
 			inboundPerms = append(inboundPerms, &ec2.IpPermission{
 				IpProtocol: aws.String("tcp"),
 				FromPort:   aws.Int64(int64(nodeExporter)),
@@ -1428,7 +1428,7 @@ func (d *Driver) configureSecurityGroupPermissions(group *ec2.SecurityGroup) ([]
 		}
 
 		// nodePorts
-		if !hasPortsInbound[fmt.Sprintf("%d/tcp", nodePorts[0])] {
+		if _, ok := hasPortsInbound[fmt.Sprintf("%d/tcp", nodePorts[0])]; !ok {
 			inboundPerms = append(inboundPerms, &ec2.IpPermission{
 				IpProtocol: aws.String("tcp"),
 				FromPort:   aws.Int64(int64(nodePorts[0])),
@@ -1437,7 +1437,7 @@ func (d *Driver) configureSecurityGroupPermissions(group *ec2.SecurityGroup) ([]
 			})
 		}
 
-		if !hasPortsInbound[fmt.Sprintf("%d/udp", nodePorts[0])] {
+		if _, ok := hasPortsInbound[fmt.Sprintf("%d/udp", nodePorts[0])]; !ok {
 			inboundPerms = append(inboundPerms, &ec2.IpPermission{
 				IpProtocol: aws.String("udp"),
 				FromPort:   aws.Int64(int64(nodePorts[0])),
@@ -1447,7 +1447,7 @@ func (d *Driver) configureSecurityGroupPermissions(group *ec2.SecurityGroup) ([]
 		}
 
 		// nginx ingress
-		if !hasPortsInbound[fmt.Sprintf("%d/tcp", httpPort)] {
+		if _, ok := hasPortsInbound[fmt.Sprintf("%d/tcp", httpPort)]; !ok {
 			inboundPerms = append(inboundPerms, &ec2.IpPermission{
 				IpProtocol: aws.String("tcp"),
 				FromPort:   aws.Int64(int64(httpPort)),
@@ -1456,7 +1456,7 @@ func (d *Driver) configureSecurityGroupPermissions(group *ec2.SecurityGroup) ([]
 			})
 		}
 
-		if !hasPortsInbound[fmt.Sprintf("%d/tcp", httpsPort)] {
+		if _, ok := hasPortsInbound[fmt.Sprintf("%d/tcp", httpsPort)]; !ok {
 			inboundPerms = append(inboundPerms, &ec2.IpPermission{
 				IpProtocol: aws.String("tcp"),
 				FromPort:   aws.Int64(int64(httpsPort)),
@@ -1466,7 +1466,7 @@ func (d *Driver) configureSecurityGroupPermissions(group *ec2.SecurityGroup) ([]
 		}
 
 		// calico additional port: https://docs.projectcalico.org/getting-started/openstack/requirements#network-requirements
-		if !hasPortsInbound[fmt.Sprintf("%d/tcp", calicoPort)] {
+		if _, ok := hasPortsInbound[fmt.Sprintf("%d/tcp", calicoPort)]; !ok {
 			inboundPerms = append(inboundPerms, &ec2.IpPermission{
 				IpProtocol: aws.String("tcp"),
 				FromPort:   aws.Int64(int64(calicoPort)),
@@ -1486,7 +1486,7 @@ func (d *Driver) configureSecurityGroupPermissions(group *ec2.SecurityGroup) ([]
 		if err != nil {
 			return nil, fmt.Errorf("invalid port number %s: %s", port, err)
 		}
-		if !hasPortsInbound[fmt.Sprintf("%s/%s", port, protocol)] {
+		if _, ok := hasPortsInbound[fmt.Sprintf("%s/%s", port, protocol)]; !ok {
 			inboundPerms = append(inboundPerms, &ec2.IpPermission{
 				IpProtocol: aws.String(protocol),
 				FromPort:   aws.Int64(portNum),
