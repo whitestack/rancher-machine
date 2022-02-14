@@ -5,7 +5,7 @@ inside your own data center. It creates servers, installs Docker on them, then
 configures the Docker client to talk to them.
 
 ## Installation and documentation
-The original full Docker Machine documentation [is available here](https://docs.docker.com/machine/).
+The original full Docker Machine documentation [is available here](https://gcbw.github.io/docker.github.io/machine/).
 
 This project is intended to be embedded and executed by the full [Rancher](https://github.com/rancher/rancher) product
 and the stand alone cli functionality will remain but the human use of it will not be the primary focus as we will expect
