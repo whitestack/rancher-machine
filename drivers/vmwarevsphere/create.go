@@ -10,10 +10,13 @@ import (
 	"github.com/vmware/govmomi/vapi/library"
 	vapifinder "github.com/vmware/govmomi/vapi/library/finder"
 	"github.com/vmware/govmomi/vapi/vcenter"
+	"github.com/vmware/govmomi/vim25/mo"
 	"github.com/vmware/govmomi/vim25/soap"
 	"github.com/vmware/govmomi/vim25/types"
 )
 
+// preCreate creates a soap client and then fetches defaults
+// for datacenter, hostsystem, and resourcepool
 func (d *Driver) preCreate() error {
 	c, err := d.getSoapClient()
 	if err != nil {
@@ -63,10 +66,12 @@ func (d *Driver) preCreate() error {
 			return err
 		}
 	}
-
 	return nil
 }
 
+// postCreate adds additional VM configuration,
+// parses, applies, and creates the cloudInit ISO
+// and adds tags and custom attributes
 func (d *Driver) postCreate(vm *object.VirtualMachine) error {
 	if err := d.addConfigParams(vm); err != nil {
 		return err
@@ -87,6 +92,8 @@ func (d *Driver) postCreate(vm *object.VirtualMachine) error {
 	return d.Start()
 }
 
+// createLegacy provisions a legacy vSphere VM
+// legacy Windows VMs are not supported
 func (d *Driver) createLegacy() error {
 	c, err := d.getSoapClient()
 	if err != nil {
@@ -241,6 +248,14 @@ func (d *Driver) createFromVmName() error {
 		return err
 	}
 
+	var o mo.VirtualMachine
+
+	if err = vm2Clone.Properties(d.getCtx(), vm2Clone.Reference(), []string{"summary.config.guestId"}, &o); err != nil {
+		return err
+	}
+	// ensure that the guestId of the new vm matches the vm it is cloned from
+	spec.Config.GuestId = o.Summary.Config.GuestId
+
 	folder, err := d.findFolder()
 	if err != nil {
 		return err
@@ -266,6 +281,7 @@ func (d *Driver) createFromVmName() error {
 		return err
 	}
 
+	log.Debugf("[createFromVmName] machine [%s] has OS [%s]", d.MachineName, d.OS)
 	return d.postCreate(vm)
 }
 
@@ -342,6 +358,8 @@ func (d *Driver) createFromLibraryName() error {
 	// Reconfiguration of the VM based on driver inputs follows
 
 	vm := obj.(*object.VirtualMachine)
+	log.Debugf("[createFromLibraryName] machine [%s] has OS [%s]", d.MachineName, d.OS)
+
 	spec := types.VirtualMachineConfigSpec{
 		NumCPUs:    int32(d.CPU),
 		MemoryMB:   int64(d.Memory),

@@ -33,7 +33,7 @@ import (
 )
 
 var (
-	errNoMachineName = errors.New("Error: No machine name specified")
+	errNoMachineName = errors.New("error: No machine name specified")
 )
 
 var (
@@ -143,7 +143,7 @@ var (
 
 func cmdCreateInner(c CommandLine, api libmachine.API) error {
 	if len(c.Args()) > 1 {
-		return fmt.Errorf("Invalid command line. Found extra arguments %v", c.Args()[1:])
+		return fmt.Errorf("[cmdCreateInner] invalid command line. Found extra arguments %v", c.Args()[1:])
 	}
 
 	name := c.Args().First()
@@ -153,11 +153,11 @@ func cmdCreateInner(c CommandLine, api libmachine.API) error {
 	}
 
 	if !host.ValidateHostName(name) {
-		return fmt.Errorf("Error creating machine: %s", mcnerror.ErrInvalidHostname)
+		return fmt.Errorf("[cmdCreateInner] error creating machine: [%s]", mcnerror.ErrInvalidHostname)
 	}
 
 	if err := validateSwarmDiscovery(c.String("swarm-discovery")); err != nil {
-		return fmt.Errorf("Error parsing swarm discovery: %s", err)
+		return fmt.Errorf("[cmdCreateInner] error parsing swarm discovery: [%s]", err)
 	}
 
 	// TODO: Fix hacky JSON solution
@@ -166,13 +166,13 @@ func cmdCreateInner(c CommandLine, api libmachine.API) error {
 		StorePath:   c.GlobalString("storage-path"),
 	})
 	if err != nil {
-		return fmt.Errorf("Error attempting to marshal bare driver data: %s", err)
+		return fmt.Errorf("[cmdCreateInner] error attempting to marshal bare driver data: %s", err)
 	}
 
 	driverName := c.String("driver")
 	h, err := api.NewHost(driverName, rawDriver)
 	if err != nil {
-		return fmt.Errorf("Error getting new host: %s", err)
+		return fmt.Errorf("[cmdCreateInner] error getting new host: %s", err)
 	}
 
 	h.HostOptions = &host.Options{
@@ -214,7 +214,7 @@ func cmdCreateInner(c CommandLine, api libmachine.API) error {
 
 	exists, err := api.Exists(h.Name)
 	if err != nil {
-		return fmt.Errorf("Error checking if host exists: %s", err)
+		return fmt.Errorf("[cmdCreateInner] error checking if host exists: %s", err)
 	}
 	if exists {
 		return mcnerror.ErrHostAlreadyExists{
@@ -228,6 +228,7 @@ func cmdCreateInner(c CommandLine, api libmachine.API) error {
 	mcnFlags := h.Driver.GetCreateFlags()
 	driverOpts := getDriverOpts(c, mcnFlags)
 	userdataFlag := drivers.DriverUserdataFlag(h.Driver)
+	osFlag := drivers.DriverOSFlag(h.Driver)
 
 	customInstallScript := c.String("custom-install-script")
 	if customInstallScript != "" {
@@ -237,16 +238,15 @@ func cmdCreateInner(c CommandLine, api libmachine.API) error {
 		h.HostOptions.SwarmOptions = nil
 
 		if userdataFlag != "" {
-			err = updateUserdataFile(driverOpts, name, userdataFlag, customInstallScript)
+			err = updateUserdataFile(driverOpts, name, userdataFlag, osFlag, customInstallScript)
 			if err != nil {
-				return fmt.Errorf("could not alter cloud-init file: %v", err)
+				return fmt.Errorf("[cmdCreateInner] could not alter cloud-init file: %v", err)
 			}
-			log.Debugf("user data file replaced with %v", driverOpts.Values[userdataFlag])
 		}
 	}
 
 	if err := h.Driver.SetConfigFromFlags(driverOpts); err != nil {
-		return fmt.Errorf("Error setting machine configuration from flags provided: %s", err)
+		return fmt.Errorf("[cmdCreateInner] error setting machine configuration from flags provided: %s", err)
 	}
 
 	if err := api.Create(h); err != nil {
@@ -268,17 +268,17 @@ func cmdCreateInner(c CommandLine, api libmachine.API) error {
 	}
 
 	if err := api.Save(h); err != nil {
-		return fmt.Errorf("Error attempting to save store: %s", err)
+		return fmt.Errorf("[cmdCreateInner] error attempting to save store: %s", err)
 	}
 
 	if customInstallScript == "" {
-		log.Infof("To see how to connect your Docker Client to the Docker Engine running on this virtual machine, run: %s env %s", os.Args[0], name)
+		log.Infof("[cmdCreateInner] to see how to connect your Docker Client to the Docker Engine running on this virtual machine, run: %s env %s", os.Args[0], name)
 	}
 
 	return nil
 }
 
-// The following function is needed because the CLI acrobatics that we're doing
+// flagHackLookup is needed because the CLI acrobatics that we're doing
 // (with having an "outer" and "inner" function each with their own custom
 // settings and flag parsing needs) are not well supported by codegangsta/cli.
 //
@@ -334,7 +334,7 @@ func cmdCreateOuter(c CommandLine, api libmachine.API) error {
 		MachineName: flagLookupMachineName,
 	})
 	if err != nil {
-		return fmt.Errorf("Error attempting to marshal bare driver data: %s", err)
+		return fmt.Errorf("[cmdCreateOuter] error attempting to marshal bare driver data: %s", err)
 	}
 
 	h, err := api.NewHost(driverName, rawDriver)
@@ -353,7 +353,7 @@ func cmdCreateOuter(c CommandLine, api libmachine.API) error {
 	// on the requested driver.
 	cliFlags, err := convertMcnFlagsToCliFlags(mcnFlags)
 	if err != nil {
-		return fmt.Errorf("Error trying to convert provided driver flags to cli flags: %s", err)
+		return fmt.Errorf("[cmdCreateOuter] error trying to convert provided driver flags to cli flags: %s", err)
 	}
 
 	for i := range c.Application().Commands {
@@ -440,7 +440,7 @@ func convertMcnFlagsToCliFlags(mcnFlags []mcnflag.Flag) ([]cli.Flag, error) {
 			})
 		default:
 			log.Warn("Flag is ", f)
-			return nil, fmt.Errorf("Flag is unrecognized flag type: %T", t)
+			return nil, fmt.Errorf("[convertMcnFlagsToCliFlags] flag is unrecognized flag type: %T", t)
 		}
 	}
 
@@ -452,7 +452,6 @@ func addDriverFlagsToCommand(cliFlags []cli.Flag, cmd *cli.Command) *cli.Command
 	cmd.SkipFlagParsing = false
 	cmd.Action = runCommand(cmdCreateInner)
 	sort.Sort(ByFlagName(cmd.Flags))
-
 	return cmd
 }
 
@@ -470,7 +469,7 @@ func validateSwarmDiscovery(discovery string) error {
 		return nil
 	}
 
-	return fmt.Errorf("Swarm Discovery URL was in the wrong format: %s", discovery)
+	return fmt.Errorf("[validateSwarmDiscovery] swarm Discovery URL was in the wrong format: %s", discovery)
 }
 
 func tlsPath(c CommandLine, flag string, defaultName string) string {
@@ -496,13 +495,14 @@ func gzipEncode(data []byte) (string, error) {
 	return encoded, nil
 }
 
-// If the user has provided a userdata file, then we add the customInstallScript to their userdata file.
+// updateUserdataFile If the user has provided a userdata file, then we add the customInstallScript to their userdata file.
 // This assumes that the user-provided userdata file start with a shebang or `#cloud-config`
 // If the user has not provided any userdata file, then we set the customInstallScript as the userdata file.
-func updateUserdataFile(driverOpts *rpcdriver.RPCFlags, machineName, userdataFlag, customInstallScript string) error {
+func updateUserdataFile(driverOpts *rpcdriver.RPCFlags, machineName, userdataFlag, osFlag, customInstallScript string) error {
 	var userdataContent []byte
 	var err error
 	userdataFile := driverOpts.String(userdataFlag)
+	machineOS := driverOpts.String(osFlag)
 
 	if userdataFile == "" {
 		// Always convert to cloud config if user data is not provided
@@ -523,11 +523,11 @@ func updateUserdataFile(driverOpts *rpcdriver.RPCFlags, machineName, userdataFla
 
 	modifiedUserdataFile, err := ioutil.TempFile("", "modified-user-data")
 	if err != nil {
-		return err
+		return fmt.Errorf("[updateUserdataFile] unable to created tempfile [%v]\nError returned\n[%v]", modifiedUserdataFile, err)
 	}
 	defer modifiedUserdataFile.Close()
 
-	if err := replaceUserdataFile(machineName, userdataContent, customScriptContent, modifiedUserdataFile); err != nil {
+	if err := replaceUserdataFile(machineName, machineOS, userdataContent, customScriptContent, modifiedUserdataFile); err != nil {
 		return err
 	}
 
@@ -536,19 +536,34 @@ func updateUserdataFile(driverOpts *rpcdriver.RPCFlags, machineName, userdataFla
 	return nil
 }
 
-func writeCloudConfig(machineName, encodedData string, cf map[interface{}]interface{}, newUserDataFile *os.File) error {
-	// Add to the write_files directive
+// writeCloudConfig sets custom install script path to the runcmd directive
+// and passes the script path to commonCloudConfig
+func writeCloudConfig(machineName, encodedData, machineOS string, cf map[interface{}]interface{}, newUserDataFile *os.File) error {
+	path := "/usr/local/custom_script/install.sh"
+	if strings.Contains(machineOS, "windows") {
+		// the writeFile path should ideally be C:\usr\local\custom_script\install.ps1
+		// but we can't guarantee that directory exists or can be created on the target machine
+		path = "C:\\install.ps1"
+	}
+	return commonCloudConfig(machineName, machineOS, encodedData, path, cf, newUserDataFile)
+}
+
+// commonCloudConfig contains the shared cloud-config logic for writeCloudConfig
+// it adds content to the write_files directive of the cloud-config file as well as sets the hostname
+// the content added is based on the OS passed with a hard default to linux
+// windows is the only other supported OS
+func commonCloudConfig(machineName, machineOS, encodedData, path string, cf map[interface{}]interface{}, newUserDataFile *os.File) error {
 	writeFile := map[string]string{
 		"encoding":    "gzip+b64",
 		"content":     fmt.Sprintf("%s", encodedData),
-		"path":        "/usr/local/custom_script/install.sh",
 		"permissions": "0644",
+		"path":        path,
 	}
 	if err := addToCloudConfig(cf, "write_files", writeFile); err != nil {
 		return err
 	}
 
-	// Add to the runmd directive
+	// Add to the runcmd directive
 	if err := addToCloudConfig(cf, "runcmd", fmt.Sprintf("sh %s", writeFile["path"])); err != nil {
 		return err
 	}
@@ -556,6 +571,10 @@ func writeCloudConfig(machineName, encodedData string, cf map[interface{}]interf
 	// Add the hostname
 	if _, ok := cf["hostname"]; !ok {
 		cf["hostname"] = machineName
+	}
+	if err := addToCloudConfig(cf, "set_hostname", machineName); err != nil {
+		log.Debugf("writeCloudConfig: wrote set_hostname field for %s machine %s", machineName, machineOS)
+		return err
 	}
 
 	userdataContent, err := yaml.Marshal(cf)
@@ -568,9 +587,6 @@ func writeCloudConfig(machineName, encodedData string, cf map[interface{}]interf
 	if err != nil {
 		return err
 	}
-
-	log.Debugf("Modified userdata file contents: %+v", string(userdataContent))
-
 	return nil
 }
 
@@ -578,7 +594,7 @@ func writeCloudConfig(machineName, encodedData string, cf map[interface{}]interf
 // temp file for this content.
 // If the user-provided userdata file starts with a shebang, then we can add it to the customScriptContent and add data to the `runcmd` directive.
 // fi the user-provided userdata file is in cloud-config format, then we add the customScriptContent to the `runcmd` directive.
-func replaceUserdataFile(machineName string, userdataContent, customScriptContent []byte, newUserDataFile *os.File) error {
+func replaceUserdataFile(machineName, machineOS string, userdataContent, customScriptContent []byte, newUserDataFile *os.File) error {
 	var err error
 	var encodedData string
 	cf := make(map[interface{}]interface{})
@@ -612,9 +628,10 @@ func replaceUserdataFile(machineName string, userdataContent, customScriptConten
 		return fmt.Errorf("existing userdata file does not begin with '#!' or '#cloud-config'")
 	}
 
-	return writeCloudConfig(machineName, encodedData, cf, newUserDataFile)
+	return writeCloudConfig(machineName, encodedData, machineOS, cf, newUserDataFile)
 }
 
+// addToCloudConfig lets you easily add key:value pairs to the cloud-config file
 func addToCloudConfig(cf map[interface{}]interface{}, key string, value interface{}) error {
 	switch section := cf[key].(type) {
 	case []interface{}:

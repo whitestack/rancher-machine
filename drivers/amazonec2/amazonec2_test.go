@@ -1,19 +1,18 @@
 package amazonec2
 
 import (
-	"github.com/rancher/machine/version"
 	"testing"
 
 	"errors"
-	"reflect"
-
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"reflect"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/ec2"
 	"github.com/rancher/machine/commands/commandstest"
+	"github.com/rancher/machine/version"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -27,9 +26,9 @@ const (
 var (
 	/* This test resource should be used in tests that set their own IpPermissions */
 	securityGroup = &ec2.SecurityGroup{
-		GroupName:     aws.String("test-group"),
-		GroupId:       aws.String("12345"),
-		VpcId:         aws.String("12345"),
+		GroupName: aws.String("test-group"),
+		GroupId:   aws.String("12345"),
+		VpcId:     aws.String("12345"),
 	}
 
 	/* This test resource should only be used in tests that do not update IpPermissions */

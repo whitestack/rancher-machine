@@ -53,6 +53,7 @@ type Options struct {
 	Memory              int
 	Disk                int
 	CustomInstallScript string
+	MachineOS           string
 	EngineOptions       *engine.Options
 	SwarmOptions        *swarm.Options
 	AuthOptions         *auth.Options

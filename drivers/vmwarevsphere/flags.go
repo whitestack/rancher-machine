@@ -4,18 +4,25 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"strings"
 
 	"github.com/rancher/machine/libmachine/drivers"
 	"github.com/rancher/machine/libmachine/mcnflag"
 	"github.com/vmware/govmomi/vim25/types"
 )
 
-var supportedCreationTypes = map[string]bool{
-	creationTypeVM:      true,
-	creationTypeTmpl:    true,
-	creationTypeLibrary: true,
-	creationTypeLegacy:  true,
-}
+var (
+	supportedMachineOS = map[string]struct{}{
+		"windows": {},
+		"linux":   {},
+	}
+	supportedCreationTypes = map[string]struct{}{
+		creationTypeVM:      {},
+		creationTypeTmpl:    {},
+		creationTypeLibrary: {},
+		creationTypeLegacy:  {},
+	}
+)
 
 func (d *Driver) GetCreateFlags() []mcnflag.Flag {
 	return []mcnflag.Flag{
@@ -173,6 +180,12 @@ func (d *Driver) GetCreateFlags() []mcnflag.Flag {
 			Usage:  "If using a non-B2D image the uploaded keys will need chown'ed, defaults to staff e.g. docker:staff",
 			Value:  defaultSSHUserGroup,
 		},
+		mcnflag.StringFlag{
+			EnvVar: "",
+			Name:   "vmwarevsphere-os",
+			Usage:  "If using a non-B2D image you can specify the desired machine OS",
+			Value:  defaultMachineOS,
+		},
 		mcnflag.StringSliceFlag{
 			EnvVar: "",
 			Name:   "vmwarevsphere-tag",
@@ -232,7 +245,11 @@ func (d *Driver) SetConfigFromFlags(flags drivers.DriverOptions) error {
 
 	d.CreationType = flags.String("vmwarevsphere-creation-type")
 	if _, ok := supportedCreationTypes[d.CreationType]; !ok {
-		return fmt.Errorf("Creation type %s not supported", d.CreationType)
+		return fmt.Errorf("creation type %s not supported", d.CreationType)
+	}
+	err := d.SetMachineOSFromFlags(flags)
+	if err != nil {
+		return err
 	}
 
 	d.ContentLibrary = flags.String("vmwarevsphere-content-library")
@@ -277,4 +294,22 @@ func (f *FileAttrFlag) SetPerms(owner, group, perms int) {
 
 func (f *FileAttrFlag) Attr() types.BaseGuestFileAttributes {
 	return &f.GuestPosixFileAttributes
+}
+
+func (d *Driver) SetMachineOSFromFlags(flags drivers.DriverOptions) error {
+	d.OS = strings.ToLower(flags.String("--vmwarevsphere-os"))
+	if d.OS == "" {
+		d.OS = defaultMachineOS
+		return nil
+	}
+	err := d.CheckMachineOS(d.OS)
+	if !err {
+		return fmt.Errorf("[SetMachineOSFromFlags] Machine [%s] has an unsupported MachineOS [%s]\n", d.MachineName, d.OS)
+	}
+	return nil
+}
+
+func (d *Driver) CheckMachineOS(os string) bool {
+	_, ok := supportedMachineOS[os]
+	return ok
 }
