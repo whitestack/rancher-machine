@@ -2,6 +2,12 @@
 set -e
 termination_log="/dev/termination-log"
 
+if [ -x "$(command -v c_rehash)" ]; then
+  # c_rehash is run here instead of update-ca-certificates because the latter requires root privileges
+  # and the rancher-machine container is run as non-root user.
+  c_rehash
+fi
+
 for i; do
   shift
   case $i in
