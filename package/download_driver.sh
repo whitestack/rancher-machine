@@ -2,6 +2,16 @@
 
 driver_prefix=docker-machine-driver-
 
+if [ -n "${SSL_CERT_DIR}" ]; then
+  ln -s /etc/ssl/certs/* "${SSL_CERT_DIR}"
+fi
+
+if [ -x "$(command -v c_rehash)" ]; then
+  # c_rehash is run here instead of update-ca-certificates because the latter requires root privileges
+  # and the rancher-machine container is run as non-root user.
+  c_rehash
+fi
+
 curl -sLO "$1"
 driver_file=$(ls $driver_prefix*)
 driver_name=$(echo "$driver_file" | sed -e "s/^$driver_prefix//" -e "s/[-_\.].*$//")
