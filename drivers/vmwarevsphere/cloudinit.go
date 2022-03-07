@@ -6,9 +6,9 @@ import (
 	"io/ioutil"
 	"net/url"
 	"os"
+	"os/exec"
 	"path/filepath"
 
-	"github.com/diskfs/go-diskfs/filesystem/iso9660"
 	"github.com/rancher/machine/libmachine/log"
 	"github.com/vmware/govmomi/object"
 	"github.com/vmware/govmomi/vim25/soap"
@@ -154,51 +154,40 @@ func (d *Driver) createCloudInitIso() error {
 		return err
 	}
 
-	md := []byte(fmt.Sprintf("local-hostname: %s\n", d.MachineName))
+	md := []byte(fmt.Sprintf("hostname: %s\n", d.MachineName))
 	if err = ioutil.WriteFile(metadata, md, perm); err != nil {
 		return err
 	}
 
-	//making iso
-	blocksize := int64(2048)
-	diskImg := filepath.Join(isoDir, isoName)
-	iso, err := os.OpenFile(diskImg, os.O_CREATE|os.O_RDWR, perm)
-	if err != nil {
-		return err
-	}
-	defer iso.Close()
-
-	fs, err := iso9660.Create(iso, 0, 0, blocksize)
-	if err != nil {
-		return err
-	}
-
-	err = fs.Mkdir("/")
-	if err != nil {
-		return err
-	}
-
+	// validate that our files are present in the isoDir before creating the ISO
 	for filename, filepath := range map[string]string{"user-data": userdata, "meta-data": metadata} {
-		f, err := ioutil.ReadFile(filepath) // just pass the file name
+		_, err = os.Stat(filepath)
 		if err != nil {
-			return err
-		}
-
-		rw, err := fs.OpenFile("/"+filename, os.O_CREATE|os.O_RDWR)
-		if err != nil {
-			return err
-		}
-
-		_, err = rw.Write(f)
-		if err != nil {
-			return err
+			return fmt.Errorf("error: %s found when verifying that %s file was present for machine %s", err, filename, d.MachineName)
 		}
 	}
 
-	return fs.Finalize(iso9660.FinalizeOptions{
-		RockRidge:        true,
-		VolumeIdentifier: "cidata",
-	})
+	err = os.Chdir(isoDir)
+	if err != nil {
+		return err
+	}
+
+	diskImg := filepath.Join(isoDir, isoName)
+	// making iso
+	// iso-level 1 ensures that files may only consist of one section and filenames are restricted to 8.3 characters.
+	// this maintains backwards compatibility with the previous go-diskfs method of creating ISOs
+	isoArgs := []string{"-J", "-r", "-hfs", "-iso-level", "1", "-V", "cidata", "-output", fmt.Sprintf("%s", diskImg), "-graft-points", fmt.Sprintf("%s", dataDir)}
+	iso := exec.Command("mkisofs", isoArgs...)
+	log.Debugf("preparing to run mkisofs command with args: \n%s\n", iso.Args)
+	// while iso.Run() would be simpler, debugging issues is extremely difficult as the machine pod cannot be exec'd into
+	// and the machine container only allows the rancher-machine binary if attempting manual debugging
+	stdoutStderr, err := iso.CombinedOutput()
+	if !iso.ProcessState.Success() || err != nil {
+		log.Errorf("mkisofs process failed, combined stdout/stderr: \n%s\n", stdoutStderr)
+		log.Errorf("error: mkisofs command finished with exit code: %v", iso.ProcessState.ExitCode())
+		return fmt.Errorf("mkisofs command finished with error: %v", err)
+	}
+	return nil
 }
 
 func (d *Driver) mountCloudInitIso(vm *object.VirtualMachine, dc *object.Datacenter, dss *object.Datastore) error {
