@@ -17,8 +17,9 @@ import (
 )
 
 const (
-	isoName = "user-data.iso"
-	isoDir  = "cloudinit"
+	isoName     = "user-data.iso"
+	isoDir      = "cloudinit"
+	mkisofsName = "mkisofs"
 )
 
 func (d *Driver) cloudInit(vm *object.VirtualMachine) error {
@@ -167,26 +168,39 @@ func (d *Driver) createCloudInitIso() error {
 		}
 	}
 
-	err = os.Chdir(isoDir)
+	err = os.Chdir(filepath.Join(d.StorePath, "machines", d.MachineName))
 	if err != nil {
 		return err
 	}
 
 	diskImg := filepath.Join(isoDir, isoName)
+
 	// making iso
 	// iso-level 1 ensures that files may only consist of one section and filenames are restricted to 8.3 characters.
 	// this maintains backwards compatibility with the previous go-diskfs method of creating ISOs
-	isoArgs := []string{"-J", "-r", "-hfs", "-iso-level", "1", "-V", "cidata", "-output", fmt.Sprintf("%s", diskImg), "-graft-points", fmt.Sprintf("%s", dataDir)}
-	iso := exec.Command("mkisofs", isoArgs...)
-	log.Debugf("preparing to run mkisofs command with args: \n%s\n", iso.Args)
-	// while iso.Run() would be simpler, debugging issues is extremely difficult as the machine pod cannot be exec'd into
-	// and the machine container only allows the rancher-machine binary if attempting manual debugging
-	stdoutStderr, err := iso.CombinedOutput()
-	if !iso.ProcessState.Success() || err != nil {
-		log.Errorf("mkisofs process failed, combined stdout/stderr: \n%s\n", stdoutStderr)
-		log.Errorf("error: mkisofs command finished with exit code: %v", iso.ProcessState.ExitCode())
-		return fmt.Errorf("mkisofs command finished with error: %v", err)
+	path, err := binaryPathLookup(mkisofsName)
+	if err != nil {
+		return fmt.Errorf("createCloudInitIso: path lookup for %s failed: %v", mkisofsName, err)
 	}
+
+	isoArgs := []string{"-J", "-r", "-hfs", "-iso-level", "1", "-V", "cidata", "-output",
+		fmt.Sprintf("%s", diskImg), "-graft-points", fmt.Sprintf("%s", dataDir)}
+	iso := exec.Command(path, isoArgs...)
+	iso.Env = []string{
+		"PATH=" + os.Getenv("PATH"),
+	}
+	iso.Stdout = os.Stdout
+	iso.Stderr = os.Stderr
+	err = iso.Start()
+	if err != nil {
+		return fmt.Errorf("createCloudInitIso: mkisofs command failed to start with error %v", err)
+	}
+	log.Debugf("createCloudInitIso: Waiting for mkisofs command to finish...")
+	err = iso.Wait()
+	if err != nil {
+		return fmt.Errorf("createCloudInitIso: mkisofs command failed to complete with error: %v", err)
+	}
+	log.Debugf("createCloudInitIso: mkisofs command successfully finished")
 	return nil
 }
 
@@ -292,4 +306,12 @@ func (d *Driver) addSSHUserToYaml(sshkey string) (string, error) {
 		return "", err
 	}
 	return string(yaml), nil
+}
+
+func binaryPathLookup(name string) (string, error) {
+	path, err := exec.LookPath(name)
+	if err != nil {
+		return "", fmt.Errorf("binaryPathLookup: error returned when trying to find [%s] executable: [%v]", name, err)
+	}
+	return path, nil
 }
