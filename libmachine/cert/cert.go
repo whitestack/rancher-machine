@@ -266,10 +266,13 @@ func (xcg *X509CertGenerator) ValidateCertificate(addr string, authOptions *auth
 		TLSClientConfig: tlsConfig,
 	}
 
-	envVar := util.GetProxyURL()
-	if envVar != "" {
-		log.Debugf("proxy address is used: %s", envVar)
-		url, err := url.Parse("http://" + envVar)
+	proxy_url, err := util.GetProxyHostnamePortForHost(addr)
+	if err != nil {
+		return false, err
+	}
+	if proxy_url != "" {
+		log.Debugf("proxy address is used: %s", proxy_url)
+		url, err := url.Parse("http://" + proxy_url)
 		if err != nil {
 			return false, err
 		}

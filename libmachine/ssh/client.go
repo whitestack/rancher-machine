@@ -338,13 +338,15 @@ func NewExternalClient(sshBinaryPath, user, host string, port int, auth *Auth) (
 	client := &ExternalClient{
 		BinaryPath: sshBinaryPath,
 	}
-
 	var args []string
-	envVar := util.GetProxyURL()
+	proxy_url, err := util.GetProxyHostnamePortForHost(host)
+	if err != nil {
+		return nil, err
+	}
 	ncBinaryPath, _ := exec.LookPath("nc")
-	log.Debugf("envVar: %s; ncBinaryPath: %s", envVar, ncBinaryPath)
-	if envVar != "" && ncBinaryPath != "" {
-		args = append(baseSSHArgs, "-o", fmt.Sprintf(SSHProxyArg, ncBinaryPath, envVar), fmt.Sprintf("%s@%s", user, host))
+	log.Debugf("proxy_url: %s; ncBinaryPath: %s", proxy_url, ncBinaryPath)
+	if proxy_url != "" && ncBinaryPath != "" {
+		args = append(baseSSHArgs, "-o", fmt.Sprintf(SSHProxyArg, ncBinaryPath, proxy_url), fmt.Sprintf("%s@%s", user, host))
 	} else {
 		args = append(baseSSHArgs, fmt.Sprintf("%s@%s", user, host))
 	}

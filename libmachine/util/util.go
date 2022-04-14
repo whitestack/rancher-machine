@@ -1,10 +1,9 @@
 package util
 
 import (
+	"fmt"
+	"net/http"
 	"os"
-	"strings"
-
-	"github.com/rancher/machine/libmachine/log"
 )
 
 func FindEnvAny(names ...string) string {
@@ -16,14 +15,17 @@ func FindEnvAny(names ...string) string {
 	return ""
 }
 
-func GetProxyURL() string {
-	urlRaw := FindEnvAny("HTTP_PROXY", "HTTPS_PROXY")
-	if urlRaw == "" {
-		log.Debug("env var HTTP_PROXY or HTTPS_PROXY is not found")
-		return ""
+func GetProxyHostnamePortForHost(hostname string) (string, error) {
+	req, err := http.NewRequest("GET", "http://"+hostname, nil)
+	if err != nil {
+		return "", err
 	}
-	urlRaw = strings.ToLower(urlRaw)
-	urlRaw = strings.TrimPrefix(urlRaw, "http://")
-	urlRaw = strings.TrimPrefix(urlRaw, "https://")
-	return urlRaw
+	proxy, err := http.ProxyFromEnvironment(req)
+	if err != nil {
+		return "", err
+	}
+	if proxy != nil {
+		return fmt.Sprintf("%s:%s", proxy.Hostname(), proxy.Port()), nil
+	}
+	return "", nil
 }
