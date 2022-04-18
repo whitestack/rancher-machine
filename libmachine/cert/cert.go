@@ -7,7 +7,6 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/pem"
-	"fmt"
 	"io/ioutil"
 	"math/big"
 	"net"
@@ -19,7 +18,6 @@ import (
 
 	"github.com/rancher/machine/libmachine/auth"
 	"github.com/rancher/machine/libmachine/log"
-	"github.com/rancher/machine/libmachine/util"
 )
 
 var defaultGenerator = NewX509CertGenerator()
@@ -264,15 +262,7 @@ func (xcg *X509CertGenerator) ValidateCertificate(addr string, authOptions *auth
 
 	transport := http.Transport{
 		TLSClientConfig: tlsConfig,
-	}
-
-	proxy, err := util.GetProxyURL("https://" + addr)
-	if err != nil {
-		return false, fmt.Errorf("failed to get the https proxy when validating the cert: %v", err)
-	}
-	if proxy != nil {
-		log.Debugf("proxy is used for validating certs: %s", proxy.String())
-		transport.Proxy = http.ProxyURL(proxy)
+		Proxy:           http.ProxyFromEnvironment,
 	}
 	client := http.Client{
 		Transport: &transport,
