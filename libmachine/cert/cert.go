@@ -7,11 +7,11 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/pem"
+	"fmt"
 	"io/ioutil"
 	"math/big"
 	"net"
 	"net/http"
-	"net/url"
 	"os"
 	"time"
 
@@ -266,22 +266,19 @@ func (xcg *X509CertGenerator) ValidateCertificate(addr string, authOptions *auth
 		TLSClientConfig: tlsConfig,
 	}
 
-	proxy_url, err := util.GetProxyHostnamePortForHost(addr)
+	proxy, err := util.GetProxyURL(addr, "https")
 	if err != nil {
-		return false, err
+		return false, fmt.Errorf("failed to get the https proxy when validating the cert: %v", err)
 	}
-	if proxy_url != "" {
-		log.Debugf("proxy address is used: %s", proxy_url)
-		url, err := url.Parse("http://" + proxy_url)
-		if err != nil {
-			return false, err
-		}
-		transport.Proxy = http.ProxyURL(url)
+	if proxy != nil {
+		log.Debugf("proxy is used for validating certs: %s", proxy.String())
+		transport.Proxy = http.ProxyURL(proxy)
 	}
 	client := http.Client{
 		Transport: &transport,
 		Timeout:   time.Second * 20,
 	}
+	// A https request is used to validate the certificates
 	_, err = client.Get("https://" + addr + "/version")
 	if err != nil {
 		return false, err
