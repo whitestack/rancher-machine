@@ -1,13 +1,9 @@
 package util
 
 import (
-	"fmt"
 	"net/http"
 	"net/url"
 	"os"
-	"strings"
-
-	"github.com/rancher/wrangler/pkg/slice"
 )
 
 func FindEnvAny(names ...string) string {
@@ -19,16 +15,12 @@ func FindEnvAny(names ...string) string {
 	return ""
 }
 
-// GetProxyURL returns the URL of the proxy to use for this given hostIP and the scheme,
-// as indicated by the environment variables HTTP_PROXY, HTTPS_PROXY and NO_PROXY (or the lowercase versions thereof).
+// GetProxyURL returns the URL of the proxy to use for this given hostUrl as indicated by the environment variables
+// HTTP_PROXY, HTTPS_PROXY and NO_PROXY (or the lowercase versions thereof).
 // HTTPS_PROXY takes precedence over HTTP_PROXY for https requests.
-func GetProxyURL(hostIp, scheme string) (*url.URL, error) {
-	validSchema := []string{"http", "https"}
-	scheme = strings.ToLower(scheme)
-	if !slice.ContainsString(validSchema, scheme) {
-		return nil, fmt.Errorf("%s is not supported, supported schemes are http and https", scheme)
-	}
-	req, err := http.NewRequest(http.MethodGet, scheme+"://"+hostIp, nil)
+// The hostUrl may be either a complete URL or a "host[:port]", in which case the "http" scheme is assumed.
+func GetProxyURL(hostUrl string) (*url.URL, error) {
+	req, err := http.NewRequest(http.MethodGet, hostUrl, nil)
 	if err != nil {
 		return nil, err
 	}

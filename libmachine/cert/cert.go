@@ -266,7 +266,7 @@ func (xcg *X509CertGenerator) ValidateCertificate(addr string, authOptions *auth
 		TLSClientConfig: tlsConfig,
 	}
 
-	proxy, err := util.GetProxyURL(addr, "https")
+	proxy, err := util.GetProxyURL("https://" + addr)
 	if err != nil {
 		return false, fmt.Errorf("failed to get the https proxy when validating the cert: %v", err)
 	}

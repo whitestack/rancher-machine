@@ -340,7 +340,7 @@ func NewExternalClient(sshBinaryPath, user, host string, port int, auth *Auth) (
 	}
 	var args []string
 	// http proxy should be used for the SSH connection
-	proxy, err := util.GetProxyURL(host, "http")
+	proxy, err := util.GetProxyURL("http://" + host)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get the http proxy for the exernal client: %v", err)
 	}
