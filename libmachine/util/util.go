@@ -1,10 +1,9 @@
 package util
 
 import (
+	"net/http"
+	"net/url"
 	"os"
-	"strings"
-
-	"github.com/rancher/machine/libmachine/log"
 )
 
 func FindEnvAny(names ...string) string {
@@ -16,14 +15,18 @@ func FindEnvAny(names ...string) string {
 	return ""
 }
 
-func GetProxyURL() string {
-	urlRaw := FindEnvAny("HTTP_PROXY", "HTTPS_PROXY")
-	if urlRaw == "" {
-		log.Debug("env var HTTP_PROXY or HTTPS_PROXY is not found")
-		return ""
+// GetProxyURL returns the URL of the proxy to use for this given hostUrl as indicated by the environment variables
+// HTTP_PROXY, HTTPS_PROXY and NO_PROXY (or the lowercase versions thereof).
+// HTTPS_PROXY takes precedence over HTTP_PROXY for https requests.
+// The hostUrl may be either a complete URL or a "host[:port]", in which case the "http" scheme is assumed.
+func GetProxyURL(hostUrl string) (*url.URL, error) {
+	req, err := http.NewRequest(http.MethodGet, hostUrl, nil)
+	if err != nil {
+		return nil, err
 	}
-	urlRaw = strings.ToLower(urlRaw)
-	urlRaw = strings.TrimPrefix(urlRaw, "http://")
-	urlRaw = strings.TrimPrefix(urlRaw, "https://")
-	return urlRaw
+	proxy, err := http.ProxyFromEnvironment(req)
+	if err != nil {
+		return nil, err
+	}
+	return proxy, nil
 }
