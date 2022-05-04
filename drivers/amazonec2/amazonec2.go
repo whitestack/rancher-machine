@@ -56,30 +56,32 @@ const (
 )
 
 var (
-	dockerPort                           = 2376
-	swarmPort                            = 3376
-	kubeApiPort                          = 6443
-	httpPort                             = 80
-	httpsPort                            = 443
-	supervisorPort                       = 9345
-	nodeExporter                         = 9796
-	etcdPorts                            = []int64{2379, 2380}
-	clusterManagerPorts                  = []int64{6443, 6443}
-	vxlanPorts                           = []int64{4789, 4789}
-	typhaPorts                           = []int64{5473, 5473}
-	flannelPorts                         = []int64{8472, 8472}
-	otherKubePorts                       = []int64{10250, 10252}
-	kubeProxyPorts                       = []int64{10256, 10256}
-	nodePorts                            = []int64{30000, 32767}
-	calicoPort                           = 179
-	errorNoPrivateSSHKey                 = errors.New("using --amazonec2-keypair-name also requires --amazonec2-ssh-keypath")
-	errorMissingCredentials              = errors.New("amazonec2 driver requires AWS credentials configured with the --amazonec2-access-key and --amazonec2-secret-key options, environment variables, ~/.aws/credentials, or an instance role")
-	errorNoVPCIdFound                    = errors.New("amazonec2 driver requires either the --amazonec2-subnet-id or --amazonec2-vpc-id option or an AWS Account with a default vpc-id")
-	errorNoSubnetsFound                  = errors.New("The desired subnet could not be located in this region. Is '--amazonec2-subnet-id' or AWS_SUBNET_ID configured correctly?")
-	errorDisableSSLWithoutCustomEndpoint = errors.New("using --amazonec2-insecure-transport also requires --amazonec2-endpoint")
-	errorReadingUserData                 = errors.New("unable to read --amazonec2-userdata file")
-	errorInvalidValueForHTTPToken        = errors.New("httpToken must be either optional or required")
-	errorInvalidValueForHTTPEndpoint     = errors.New("httpEndpoint must be either enabled or disabled")
+	dockerPort                           int64 = 2376
+	swarmPort                            int64 = 3376
+	kubeApiPort                          int64 = 6443
+	httpPort                             int64 = 80
+	sshPort                              int64 = 22
+	rancherWebhookPort                   int64 = 8443
+	httpsPort                            int64 = 443
+	supervisorPort                       int64 = 9345
+	nodeExporter                         int64 = 9796
+	etcdPorts                                  = []int64{2379, 2380}
+	clusterManagerPorts                        = []int64{6443, 6443}
+	vxlanPorts                                 = []int64{4789, 4789}
+	typhaPorts                                 = []int64{5473, 5473}
+	flannelPorts                               = []int64{8472, 8472}
+	otherKubePorts                             = []int64{10250, 10252}
+	kubeProxyPorts                             = []int64{10256, 10256}
+	nodePorts                                  = []int64{30000, 32767}
+	calicoPort                           int64 = 179
+	errorNoPrivateSSHKey                       = errors.New("using --amazonec2-keypair-name also requires --amazonec2-ssh-keypath")
+	errorMissingCredentials                    = errors.New("amazonec2 driver requires AWS credentials configured with the --amazonec2-access-key and --amazonec2-secret-key options, environment variables, ~/.aws/credentials, or an instance role")
+	errorNoVPCIdFound                          = errors.New("amazonec2 driver requires either the --amazonec2-subnet-id or --amazonec2-vpc-id option or an AWS Account with a default vpc-id")
+	errorNoSubnetsFound                        = errors.New("The desired subnet could not be located in this region. Is '--amazonec2-subnet-id' or AWS_SUBNET_ID configured correctly?")
+	errorDisableSSLWithoutCustomEndpoint       = errors.New("using --amazonec2-insecure-transport also requires --amazonec2-endpoint")
+	errorReadingUserData                       = errors.New("unable to read --amazonec2-userdata file")
+	errorInvalidValueForHTTPToken              = errors.New("httpToken must be either optional or required")
+	errorInvalidValueForHTTPEndpoint           = errors.New("httpEndpoint must be either enabled or disabled")
 )
 
 type Driver struct {
@@ -501,7 +503,7 @@ func (d *Driver) SetConfigFromFlags(flags drivers.DriverOptions) error {
 		}
 
 		parts := strings.Split(u.Host, ":")
-		port, err := strconv.Atoi(parts[1])
+		port, err := strconv.ParseInt(parts[1], 10, 64)
 		if err != nil {
 			return err
 		}
@@ -851,7 +853,7 @@ func (d *Driver) GetURL() (string, error) {
 		return "", nil
 	}
 
-	return fmt.Sprintf("tcp://%s", net.JoinHostPort(ip, strconv.Itoa(dockerPort))), nil
+	return fmt.Sprintf("tcp://%s", net.JoinHostPort(ip, fmt.Sprintf("%d", dockerPort))), nil
 }
 
 func (d *Driver) GetIP() (string, error) {
@@ -1299,8 +1301,8 @@ func (d *Driver) configureSecurityGroupPermissions(group *ec2.SecurityGroup) ([]
 		if _, ok := hasPortsInbound["22/tcp"]; !ok {
 			inboundPerms = append(inboundPerms, &ec2.IpPermission{
 				IpProtocol: aws.String("tcp"),
-				FromPort:   aws.Int64(22),
-				ToPort:     aws.Int64(22),
+				FromPort:   aws.Int64(sshPort),
+				ToPort:     aws.Int64(sshPort),
 				IpRanges:   []*ec2.IpRange{{CidrIp: aws.String(ipRange)}},
 			})
 		}
@@ -1308,8 +1310,17 @@ func (d *Driver) configureSecurityGroupPermissions(group *ec2.SecurityGroup) ([]
 		if _, ok := hasPortsInbound[fmt.Sprintf("%d/tcp", dockerPort)]; !ok {
 			inboundPerms = append(inboundPerms, &ec2.IpPermission{
 				IpProtocol: aws.String("tcp"),
-				FromPort:   aws.Int64(int64(dockerPort)),
-				ToPort:     aws.Int64(int64(dockerPort)),
+				FromPort:   aws.Int64(dockerPort),
+				ToPort:     aws.Int64(dockerPort),
+				IpRanges:   []*ec2.IpRange{{CidrIp: aws.String(ipRange)}},
+			})
+		}
+
+		if _, ok := hasPortsInbound[fmt.Sprintf("%d/tcp", rancherWebhookPort)]; !ok {
+			inboundPerms = append(inboundPerms, &ec2.IpPermission{
+				IpProtocol: aws.String("tcp"),
+				FromPort:   aws.Int64(rancherWebhookPort),
+				ToPort:     aws.Int64(rancherWebhookPort),
 				IpRanges:   []*ec2.IpRange{{CidrIp: aws.String(ipRange)}},
 			})
 		}
@@ -1318,8 +1329,8 @@ func (d *Driver) configureSecurityGroupPermissions(group *ec2.SecurityGroup) ([]
 		if _, ok := hasPortsInbound[fmt.Sprintf("%d/tcp", kubeApiPort)]; !ok {
 			inboundPerms = append(inboundPerms, &ec2.IpPermission{
 				IpProtocol: aws.String("tcp"),
-				FromPort:   aws.Int64(int64(kubeApiPort)),
-				ToPort:     aws.Int64(int64(kubeApiPort)),
+				FromPort:   aws.Int64(kubeApiPort),
+				ToPort:     aws.Int64(kubeApiPort),
 				IpRanges:   []*ec2.IpRange{{CidrIp: aws.String(ipRange)}},
 			})
 		}
@@ -1328,8 +1339,8 @@ func (d *Driver) configureSecurityGroupPermissions(group *ec2.SecurityGroup) ([]
 		if _, ok := hasPortsInbound[fmt.Sprintf("%d/tcp", supervisorPort)]; !ok {
 			inboundPerms = append(inboundPerms, &ec2.IpPermission{
 				IpProtocol: aws.String("tcp"),
-				FromPort:   aws.Int64(int64(supervisorPort)),
-				ToPort:     aws.Int64(int64(supervisorPort)),
+				FromPort:   aws.Int64(supervisorPort),
+				ToPort:     aws.Int64(supervisorPort),
 				UserIdGroupPairs: []*ec2.UserIdGroupPair{
 					{
 						GroupId: group.GroupId,
@@ -1342,8 +1353,8 @@ func (d *Driver) configureSecurityGroupPermissions(group *ec2.SecurityGroup) ([]
 		if _, ok := hasPortsInbound[fmt.Sprintf("%d/tcp", etcdPorts[0])]; !ok {
 			inboundPerms = append(inboundPerms, &ec2.IpPermission{
 				IpProtocol: aws.String("tcp"),
-				FromPort:   aws.Int64(int64(etcdPorts[0])),
-				ToPort:     aws.Int64(int64(etcdPorts[1])),
+				FromPort:   aws.Int64(etcdPorts[0]),
+				ToPort:     aws.Int64(etcdPorts[1]),
 				UserIdGroupPairs: []*ec2.UserIdGroupPair{
 					{
 						GroupId: group.GroupId,
@@ -1356,8 +1367,8 @@ func (d *Driver) configureSecurityGroupPermissions(group *ec2.SecurityGroup) ([]
 		if _, ok := hasPortsInbound[fmt.Sprintf("%d/udp", vxlanPorts[0])]; !ok {
 			inboundPerms = append(inboundPerms, &ec2.IpPermission{
 				IpProtocol: aws.String("udp"),
-				FromPort:   aws.Int64(int64(vxlanPorts[0])),
-				ToPort:     aws.Int64(int64(vxlanPorts[1])),
+				FromPort:   aws.Int64(vxlanPorts[0]),
+				ToPort:     aws.Int64(vxlanPorts[1]),
 				UserIdGroupPairs: []*ec2.UserIdGroupPair{
 					{
 						GroupId: group.GroupId,
@@ -1384,8 +1395,8 @@ func (d *Driver) configureSecurityGroupPermissions(group *ec2.SecurityGroup) ([]
 		if _, ok := hasPortsInbound[fmt.Sprintf("%d/udp", flannelPorts[0])]; !ok {
 			inboundPerms = append(inboundPerms, &ec2.IpPermission{
 				IpProtocol: aws.String("udp"),
-				FromPort:   aws.Int64(int64(flannelPorts[0])),
-				ToPort:     aws.Int64(int64(flannelPorts[1])),
+				FromPort:   aws.Int64(flannelPorts[0]),
+				ToPort:     aws.Int64(flannelPorts[1]),
 				UserIdGroupPairs: []*ec2.UserIdGroupPair{
 					{
 						GroupId: group.GroupId,
@@ -1398,8 +1409,8 @@ func (d *Driver) configureSecurityGroupPermissions(group *ec2.SecurityGroup) ([]
 		if _, ok := hasPortsInbound[fmt.Sprintf("%d/tcp", otherKubePorts[0])]; !ok {
 			inboundPerms = append(inboundPerms, &ec2.IpPermission{
 				IpProtocol: aws.String("tcp"),
-				FromPort:   aws.Int64(int64(otherKubePorts[0])),
-				ToPort:     aws.Int64(int64(otherKubePorts[1])),
+				FromPort:   aws.Int64(otherKubePorts[0]),
+				ToPort:     aws.Int64(otherKubePorts[1]),
 				UserIdGroupPairs: []*ec2.UserIdGroupPair{
 					{
 						GroupId: group.GroupId,
@@ -1412,8 +1423,8 @@ func (d *Driver) configureSecurityGroupPermissions(group *ec2.SecurityGroup) ([]
 		if _, ok := hasPortsInbound[fmt.Sprintf("%d/tcp", kubeProxyPorts[0])]; !ok {
 			inboundPerms = append(inboundPerms, &ec2.IpPermission{
 				IpProtocol: aws.String("tcp"),
-				FromPort:   aws.Int64(int64(kubeProxyPorts[0])),
-				ToPort:     aws.Int64(int64(kubeProxyPorts[1])),
+				FromPort:   aws.Int64(kubeProxyPorts[0]),
+				ToPort:     aws.Int64(kubeProxyPorts[1]),
 				UserIdGroupPairs: []*ec2.UserIdGroupPair{
 					{
 						GroupId: group.GroupId,
@@ -1426,8 +1437,8 @@ func (d *Driver) configureSecurityGroupPermissions(group *ec2.SecurityGroup) ([]
 		if _, ok := hasPortsInbound[fmt.Sprintf("%d/tcp", nodeExporter)]; !ok {
 			inboundPerms = append(inboundPerms, &ec2.IpPermission{
 				IpProtocol: aws.String("tcp"),
-				FromPort:   aws.Int64(int64(nodeExporter)),
-				ToPort:     aws.Int64(int64(nodeExporter)),
+				FromPort:   aws.Int64(nodeExporter),
+				ToPort:     aws.Int64(nodeExporter),
 				UserIdGroupPairs: []*ec2.UserIdGroupPair{
 					{
 						GroupId: group.GroupId,
@@ -1440,8 +1451,8 @@ func (d *Driver) configureSecurityGroupPermissions(group *ec2.SecurityGroup) ([]
 		if _, ok := hasPortsInbound[fmt.Sprintf("%d/tcp", nodePorts[0])]; !ok {
 			inboundPerms = append(inboundPerms, &ec2.IpPermission{
 				IpProtocol: aws.String("tcp"),
-				FromPort:   aws.Int64(int64(nodePorts[0])),
-				ToPort:     aws.Int64(int64(nodePorts[1])),
+				FromPort:   aws.Int64(nodePorts[0]),
+				ToPort:     aws.Int64(nodePorts[1]),
 				IpRanges:   []*ec2.IpRange{{CidrIp: aws.String(ipRange)}},
 			})
 		}
@@ -1449,8 +1460,8 @@ func (d *Driver) configureSecurityGroupPermissions(group *ec2.SecurityGroup) ([]
 		if _, ok := hasPortsInbound[fmt.Sprintf("%d/udp", nodePorts[0])]; !ok {
 			inboundPerms = append(inboundPerms, &ec2.IpPermission{
 				IpProtocol: aws.String("udp"),
-				FromPort:   aws.Int64(int64(nodePorts[0])),
-				ToPort:     aws.Int64(int64(nodePorts[1])),
+				FromPort:   aws.Int64(nodePorts[0]),
+				ToPort:     aws.Int64(nodePorts[1]),
 				IpRanges:   []*ec2.IpRange{{CidrIp: aws.String(ipRange)}},
 			})
 		}
@@ -1459,8 +1470,8 @@ func (d *Driver) configureSecurityGroupPermissions(group *ec2.SecurityGroup) ([]
 		if _, ok := hasPortsInbound[fmt.Sprintf("%d/tcp", httpPort)]; !ok {
 			inboundPerms = append(inboundPerms, &ec2.IpPermission{
 				IpProtocol: aws.String("tcp"),
-				FromPort:   aws.Int64(int64(httpPort)),
-				ToPort:     aws.Int64(int64(httpPort)),
+				FromPort:   aws.Int64(httpPort),
+				ToPort:     aws.Int64(httpPort),
 				IpRanges:   []*ec2.IpRange{{CidrIp: aws.String(ipRange)}},
 			})
 		}
@@ -1468,8 +1479,8 @@ func (d *Driver) configureSecurityGroupPermissions(group *ec2.SecurityGroup) ([]
 		if _, ok := hasPortsInbound[fmt.Sprintf("%d/tcp", httpsPort)]; !ok {
 			inboundPerms = append(inboundPerms, &ec2.IpPermission{
 				IpProtocol: aws.String("tcp"),
-				FromPort:   aws.Int64(int64(httpsPort)),
-				ToPort:     aws.Int64(int64(httpsPort)),
+				FromPort:   aws.Int64(httpsPort),
+				ToPort:     aws.Int64(httpsPort),
 				IpRanges:   []*ec2.IpRange{{CidrIp: aws.String(ipRange)}},
 			})
 		}
@@ -1478,8 +1489,8 @@ func (d *Driver) configureSecurityGroupPermissions(group *ec2.SecurityGroup) ([]
 		if _, ok := hasPortsInbound[fmt.Sprintf("%d/tcp", calicoPort)]; !ok {
 			inboundPerms = append(inboundPerms, &ec2.IpPermission{
 				IpProtocol: aws.String("tcp"),
-				FromPort:   aws.Int64(int64(calicoPort)),
-				ToPort:     aws.Int64(int64(calicoPort)),
+				FromPort:   aws.Int64(calicoPort),
+				ToPort:     aws.Int64(calicoPort),
 				UserIdGroupPairs: []*ec2.UserIdGroupPair{
 					{
 						GroupId: group.GroupId,
