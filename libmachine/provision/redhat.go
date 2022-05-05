@@ -114,11 +114,32 @@ func (provisioner *RedHatProvisioner) dockerDaemonResponding() bool {
 	return true
 }
 
+func (provisioner *RedHatProvisioner) disableNetworkManagerSetupService8dot4() error {
+	if provisioner.OsReleaseInfo.VersionID != "8.4" {
+		return nil
+	}
+
+	log.Debug("Patching NetworkManager")
+	if _, err := provisioner.SSHCommand("sudo systemctl disable nm-cloud-setup.service nm-cloud-setup.timer"); err != nil {
+		return err
+	}
+
+	// ignore errors here because the SSH connection will close
+	provisioner.SSHCommand("sudo reboot")
+
+	log.Debug("NetworkManager patched, waiting for machine to reboot...")
+	return drivers.WaitForSSH(provisioner.Driver)
+}
+
 func (provisioner *RedHatProvisioner) Provision(swarmOptions swarm.Options, authOptions auth.Options, engineOptions engine.Options) error {
 	provisioner.SwarmOptions = swarmOptions
 	provisioner.AuthOptions = authOptions
 	provisioner.EngineOptions = engineOptions
 	swarmOptions.Env = engineOptions.Env
+
+	if err := provisioner.disableNetworkManagerSetupService8dot4(); err != nil {
+		return err
+	}
 
 	// set default storage driver for redhat
 	storageDriver, err := decideStorageDriver(provisioner, DefaultStorageDriver, engineOptions.StorageDriver)
