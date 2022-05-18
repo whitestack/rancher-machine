@@ -6,4 +6,5 @@ cd $(dirname $0)
 ./clean
 # ./validate
 ./build
+./test
 ./package

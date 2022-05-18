@@ -1,13 +1,12 @@
 package amazonec2
 
 import (
-	"testing"
-
 	"errors"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"reflect"
+	"testing"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/ec2"
@@ -20,10 +19,21 @@ import (
 const (
 	testSSHPort    = int64(22)
 	testDockerPort = int64(2376)
-	testSwarmPort  = int64(3376)
 )
 
 var (
+	rancherSecurityGroup = &ec2.SecurityGroup{
+		GroupName: aws.String(defaultSecurityGroup),
+		GroupId:   aws.String("12345"),
+		VpcId:     aws.String("12345"),
+		Tags: []*ec2.Tag{
+			{
+				Key:   aws.String(machineSecurityGroupName),
+				Value: aws.String("test"),
+			},
+		},
+	}
+
 	/* This test resource should be used in tests that set their own IpPermissions */
 	securityGroup = &ec2.SecurityGroup{
 		GroupName: aws.String("test-group"),
@@ -33,10 +43,16 @@ var (
 
 	/* This test resource should only be used in tests that do not update IpPermissions */
 	securityGroupNoIpPermissions = &ec2.SecurityGroup{
-		GroupName:     aws.String("test-group"),
+		GroupName:     aws.String(defaultSecurityGroup),
 		GroupId:       aws.String("12345"),
 		VpcId:         aws.String("12345"),
 		IpPermissions: []*ec2.IpPermission{},
+		Tags: []*ec2.Tag{
+			{
+				Key:   aws.String(machineSecurityGroupName),
+				Value: aws.String("test"),
+			},
+		},
 	}
 )
 
@@ -46,42 +62,16 @@ func TestConfigureSecurityGroupPermissionsEmpty(t *testing.T) {
 	perms, err := driver.configureSecurityGroupPermissions(securityGroup)
 
 	assert.Nil(t, err)
-	assert.Len(t, perms, 2)
+	assert.Empty(t, perms)
 }
 
-func TestConfigureSecurityGroupPermissionsSshOnly(t *testing.T) {
+func TestRancherSecurityGroupPermissions(t *testing.T) {
 	driver := NewTestDriver()
-	group := securityGroup
-	group.IpPermissions = []*ec2.IpPermission{
-		{
-			IpProtocol: aws.String("tcp"),
-			FromPort:   aws.Int64(int64(testSSHPort)),
-			ToPort:     aws.Int64(int64(testSSHPort)),
-		},
-	}
 
-	perms, err := driver.configureSecurityGroupPermissions(group)
+	perms, err := driver.configureSecurityGroupPermissions(rancherSecurityGroup)
 
 	assert.Nil(t, err)
-	assert.Len(t, perms, 1)
-	assert.Equal(t, testDockerPort, *perms[0].FromPort)
-}
-
-func TestConfigureSecurityGroupPermissionsDockerOnly(t *testing.T) {
-	driver := NewTestDriver()
-	group := securityGroup
-	group.IpPermissions = []*ec2.IpPermission{
-		{
-			IpProtocol: aws.String("tcp"),
-			FromPort:   aws.Int64((testDockerPort)),
-			ToPort:     aws.Int64((testDockerPort)),
-		},
-	}
-
-	perms, err := driver.configureSecurityGroupPermissions(group)
-
-	assert.Nil(t, err)
-	assert.Len(t, perms, 1)
+	assert.Len(t, perms, 17)
 	assert.Equal(t, testSSHPort, *perms[0].FromPort)
 }
 
@@ -114,44 +104,6 @@ func TestConfigureSecurityGroupPermissionsSkipReadOnly(t *testing.T) {
 
 	assert.Nil(t, err)
 	assert.Len(t, perms, 0)
-}
-
-func TestConfigureSecurityGroupPermissionsOpenPorts(t *testing.T) {
-	driver := NewTestDriver()
-	driver.OpenPorts = []string{"8888/tcp", "8080/udp", "9090"}
-	perms, err := driver.configureSecurityGroupPermissions(securityGroupNoIpPermissions)
-
-	assert.NoError(t, err)
-	assert.Len(t, perms, 5)
-	assert.Equal(t, aws.Int64(int64(8888)), perms[2].ToPort)
-	assert.Equal(t, aws.String("tcp"), perms[2].IpProtocol)
-	assert.Equal(t, aws.Int64(int64(8080)), perms[3].ToPort)
-	assert.Equal(t, aws.String("udp"), perms[3].IpProtocol)
-	assert.Equal(t, aws.Int64(int64(9090)), perms[4].ToPort)
-	assert.Equal(t, aws.String("tcp"), perms[4].IpProtocol)
-}
-
-func TestConfigureSecurityGroupPermissionsOpenPortsSkipExisting(t *testing.T) {
-	driver := NewTestDriver()
-	group := securityGroup
-	group.IpPermissions = []*ec2.IpPermission{
-		{
-			IpProtocol: aws.String("tcp"),
-			FromPort:   aws.Int64(8888),
-			ToPort:     aws.Int64(testSSHPort),
-		},
-		{
-			IpProtocol: aws.String("tcp"),
-			FromPort:   aws.Int64(8080),
-			ToPort:     aws.Int64(testSSHPort),
-		},
-	}
-	driver.OpenPorts = []string{"8888/tcp", "8080/udp", "8080"}
-	perms, err := driver.configureSecurityGroupPermissions(group)
-	assert.NoError(t, err)
-	assert.Len(t, perms, 3)
-	assert.Equal(t, aws.Int64(int64(8080)), perms[2].ToPort)
-	assert.Equal(t, aws.String("udp"), perms[2].IpProtocol)
 }
 
 func TestConfigureSecurityGroupPermissionsInvalidOpenPorts(t *testing.T) {
@@ -418,13 +370,6 @@ func TestConfigureSecurityGroupsMixed(t *testing.T) {
 	recorder.On("DescribeSecurityGroups", mock.MatchedBy(matchGroupLookup(groups))).Return(
 		&initialLookupResult, nil)
 
-	// An ingress permission is added to the existing group.
-	recorder.On("AuthorizeSecurityGroupIngress", &ec2.AuthorizeSecurityGroupIngressInput{
-		GroupId:       aws.String("existingGroupId"),
-		IpPermissions: []*ec2.IpPermission{ipPermission(testDockerPort)},
-	}).Return(
-		&ec2.AuthorizeSecurityGroupIngressOutput{}, nil)
-
 	// The new security group is created.
 	recorder.On("CreateSecurityGroup", &ec2.CreateSecurityGroupInput{
 		GroupName:   aws.String("newGroup"),
@@ -443,13 +388,6 @@ func TestConfigureSecurityGroupsMixed(t *testing.T) {
 	recorder.On("DescribeSecurityGroups",
 		&ec2.DescribeSecurityGroupsInput{GroupIds: []*string{aws.String("newGroupId")}}).Return(
 		&postCreateLookupResult, nil)
-
-	// Permissions are added to the new security group.
-	recorder.On("AuthorizeSecurityGroupIngress", &ec2.AuthorizeSecurityGroupIngressInput{
-		GroupId:       aws.String("newGroupId"),
-		IpPermissions: []*ec2.IpPermission{ipPermission(testSSHPort), ipPermission(testDockerPort)},
-	}).Return(
-		&ec2.AuthorizeSecurityGroupIngressOutput{}, nil)
 
 	recorder.On("CreateTags", &ec2.CreateTagsInput{
 		Tags: []*ec2.Tag{
@@ -497,13 +435,14 @@ func TestBase64UserDataGeneratesErrorIfFileNotFound(t *testing.T) {
 	assert.NoError(t, err, "Unable to create temporary directory.")
 
 	defer os.RemoveAll(dir)
-	userdata_path := filepath.Join(dir, "does-not-exist.yml")
+
+	userdataPath := filepath.Join(dir, "does-not-exist.yml")
 
 	driver := NewTestDriver()
-	driver.UserDataFile = userdata_path
+	driver.UserDataFile = userdataPath
 
-	_, ud_err := driver.Base64UserData()
-	assert.Equal(t, ud_err, errorReadingUserData)
+	_, udErr := driver.Base64UserData()
+	assert.Equal(t, udErr, errorReadingUserData)
 }
 
 func TestBase64UserDataIsCorrectWhenFileProvided(t *testing.T) {
@@ -512,20 +451,20 @@ func TestBase64UserDataIsCorrectWhenFileProvided(t *testing.T) {
 
 	defer os.RemoveAll(dir)
 
-	userdata_path := filepath.Join(dir, "test-userdata.yml")
+	userdataPath := filepath.Join(dir, "test-userdata.yml")
 
 	content := []byte("#cloud-config\nhostname: userdata-test\nfqdn: userdata-test.amazonec2.driver\n")
 	contentBase64 := "I2Nsb3VkLWNvbmZpZwpob3N0bmFtZTogdXNlcmRhdGEtdGVzdApmcWRuOiB1c2VyZGF0YS10ZXN0LmFtYXpvbmVjMi5kcml2ZXIK"
 
-	err = ioutil.WriteFile(userdata_path, content, 0666)
+	err = ioutil.WriteFile(userdataPath, content, 0666)
 	assert.NoError(t, err, "Unable to create temporary userdata file.")
 
 	driver := NewTestDriver()
-	driver.UserDataFile = userdata_path
+	driver.UserDataFile = userdataPath
 
-	userdata, ud_err := driver.Base64UserData()
+	userdata, udErr := driver.Base64UserData()
 
-	assert.NoError(t, ud_err)
+	assert.NoError(t, udErr)
 	assert.Equal(t, contentBase64, userdata)
 }
 

@@ -100,6 +100,7 @@ type Driver struct {
 	KeyName          string
 	InstanceId       string
 	InstanceType     string
+	OS               string
 	PrivateIPAddress string
 
 	// NB: SecurityGroupId expanded from single value to slice on 26 Feb 2016 - we maintain both for host storage backwards compatibility.
@@ -141,10 +142,6 @@ type Driver struct {
 	// Metadata Options
 	HttpEndpoint string
 	HttpTokens   string
-}
-
-type clientFactory interface {
-	build(d *Driver) Ec2Client
 }
 
 func (d *Driver) GetCreateFlags() []mcnflag.Flag {
@@ -651,7 +648,9 @@ func (d *Driver) Create() error {
 
 	if err := d.innerCreate(); err != nil {
 		// cleanup partially created resources
-		d.Remove()
+		if err := d.Remove(); err != nil {
+			return err
+		}
 		return err
 	}
 
@@ -818,7 +817,9 @@ func (d *Driver) innerCreate() error {
 		d.PrivateIPAddress = *instance.PrivateIpAddress
 	}
 
-	d.waitForInstance()
+	if err := d.waitForInstance(); err != nil {
+		return err
+	}
 
 	if d.HttpEndpoint != "" || d.HttpTokens != "" {
 		_, err := d.getClient().ModifyInstanceMetadataOptions(&ec2.ModifyInstanceMetadataOptionsInput{
@@ -1160,7 +1161,7 @@ func (d *Driver) configureSecurityGroups(groupNames []string) error {
 	}
 
 	log.Debugf("configuring security groups in %s", d.VpcId)
-	version := version.Version
+	v := version.Version
 
 	filters := []*ec2.Filter{
 		{
@@ -1236,7 +1237,7 @@ func (d *Driver) configureSecurityGroups(groupNames []string) error {
 				Tags: []*ec2.Tag{
 					{
 						Key:   aws.String(machineTag),
-						Value: aws.String(version),
+						Value: aws.String(v),
 					},
 				},
 				Resources: []*string{group.GroupId},
@@ -1249,7 +1250,7 @@ func (d *Driver) configureSecurityGroups(groupNames []string) error {
 			group.Tags = []*ec2.Tag{
 				{
 					Key:   aws.String(machineTag),
-					Value: aws.String(version),
+					Value: aws.String(v),
 				},
 			}
 
@@ -1575,7 +1576,7 @@ func buildEC2Tags(tagGroups string) []*ec2.Tag {
 
 	t := strings.Split(tagGroups, ",")
 	if len(t)%2 != 0 {
-		fmt.Println("Tags are not key value in pairs. %d elements found", len(t))
+		fmt.Printf("Tags are not key value in pairs. %d elements found\n\n", len(t))
 	}
 
 	tags := make([]*ec2.Tag, 0, len(t)/2)
@@ -1597,7 +1598,9 @@ func generateId() string {
 	}
 
 	h := md5.New()
-	io.WriteString(h, string(rb))
+	if _, err := io.WriteString(h, string(rb)); err != nil {
+		return ""
+	}
 	return fmt.Sprintf("%x", h.Sum(nil))
 }
 
