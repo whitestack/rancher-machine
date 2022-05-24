@@ -684,18 +684,10 @@ func (d *Driver) innerCreate() error {
 		AssociatePublicIpAddress: aws.Bool(!d.PrivateIPOnly),
 	}}
 
-	log.Debug("Building tags for instance creation")
-	resourceTags := d.buildResourceTags([]string{
-		ec2InstanceResource, // required
-		ec2VolumeResource,   // EBS volume
-		ec2NetworkInterfaceResource,
-	})
-
 	regionZone := d.getRegionZone()
 	log.Debugf("launching instance in subnet %s", d.SubnetId)
 
 	var instance *ec2.Instance
-
 	if d.RequestSpotInstance {
 		req := ec2.RequestSpotInstancesInput{
 			LaunchSpecification: &ec2.RequestSpotLaunchSpecification{
@@ -714,9 +706,8 @@ func (d *Driver) innerCreate() error {
 				BlockDeviceMappings: bdmList,
 				UserData:            &userdata,
 			},
-			InstanceCount:     aws.Int64(1),
-			SpotPrice:         &d.SpotPrice,
-			TagSpecifications: resourceTags,
+			InstanceCount: aws.Int64(1),
+			SpotPrice:     &d.SpotPrice,
 		}
 		if d.BlockDurationMinutes != 0 {
 			req.BlockDurationMinutes = &d.BlockDurationMinutes
@@ -780,6 +771,12 @@ func (d *Driver) innerCreate() error {
 			return fmt.Errorf("Error resolving spot instance to real instance: %v", err)
 		}
 	} else {
+		log.Debug("Building tags for instance creation")
+		resourceTags := d.buildResourceTags([]string{
+			ec2InstanceResource, // required
+			ec2VolumeResource,   // EBS volume
+			ec2NetworkInterfaceResource,
+		})
 		inst, err := d.getClient().RunInstances(&ec2.RunInstancesInput{
 			ImageId:  &d.AMI,
 			MinCount: aws.Int64(1),
@@ -821,6 +818,18 @@ func (d *Driver) innerCreate() error {
 		return err
 	}
 
+	if d.RequestSpotInstance {
+		// tags for spot instances should be added
+		// after the instance has been created and
+		// transitioned into a 'running' state. The spot-instance
+		// is created by an internal AWS process after accepting
+		// the spot-instance-request, so tags cannot be supplied
+		// within the request
+		if err := d.configureTags(instance); err != nil {
+			return err
+		}
+	}
+
 	if d.HttpEndpoint != "" || d.HttpTokens != "" {
 		_, err := d.getClient().ModifyInstanceMetadataOptions(&ec2.ModifyInstanceMetadataOptionsInput{
 			InstanceId:   aws.String(d.InstanceId),
@@ -839,6 +848,30 @@ func (d *Driver) innerCreate() error {
 	)
 
 	return nil
+}
+
+// configureTags will add tags to the instance after
+// it has been created and transitioned into 'running'.
+func (d *Driver) configureTags(instance *ec2.Instance) error {
+	tags := append(buildEC2Tags(d.Tags), &ec2.Tag{
+		Key:   aws.String("Name"),
+		Value: &d.MachineName,
+	})
+	// ensure the EBS volume and Network Interface
+	// created for an instance receive the supplied tags
+	resources := make([]*string, 0, len(instance.BlockDeviceMappings)+len(instance.NetworkInterfaces)+1) // + 1 for instanceID
+	resources = append(resources, &d.InstanceId)
+	for _, blockDeviceMapping := range instance.BlockDeviceMappings {
+		resources = append(resources, blockDeviceMapping.Ebs.VolumeId)
+	}
+	for _, networkInterface := range instance.NetworkInterfaces {
+		resources = append(resources, networkInterface.NetworkInterfaceId)
+	}
+	_, err := d.getClient().CreateTags(&ec2.CreateTagsInput{
+		Resources: resources,
+		Tags:      tags,
+	})
+	return err
 }
 
 func (d *Driver) GetURL() (string, error) {
