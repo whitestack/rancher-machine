@@ -689,35 +689,49 @@ func (d *Driver) innerCreate() error {
 
 	var instance *ec2.Instance
 	if d.RequestSpotInstance {
-		req := ec2.RequestSpotInstancesInput{
-			LaunchSpecification: &ec2.RequestSpotLaunchSpecification{
-				ImageId: &d.AMI,
-				Placement: &ec2.SpotPlacement{
-					AvailabilityZone: &regionZone,
-				},
-				KeyName:           &d.KeyName,
-				InstanceType:      &d.InstanceType,
-				NetworkInterfaces: netSpecs,
-				Monitoring:        &ec2.RunInstancesMonitoringEnabled{Enabled: aws.Bool(d.Monitoring)},
-				IamInstanceProfile: &ec2.IamInstanceProfileSpecification{
-					Name: &d.IamInstanceProfile,
-				},
-				EbsOptimized:        &d.UseEbsOptimizedInstance,
-				BlockDeviceMappings: bdmList,
-				UserData:            &userdata,
+		req := ec2.RunInstancesInput{
+			ImageId: &d.AMI,
+			MinCount: aws.Int64(1),
+			MaxCount: aws.Int64(1),
+			Placement: &ec2.Placement{
+				AvailabilityZone: &regionZone,
 			},
-			InstanceCount: aws.Int64(1),
-			SpotPrice:     &d.SpotPrice,
-		}
-		if d.BlockDurationMinutes != 0 {
-			req.BlockDurationMinutes = &d.BlockDurationMinutes
+			KeyName:           &d.KeyName,
+			InstanceType:      &d.InstanceType,
+			NetworkInterfaces: netSpecs,
+			Monitoring:        &ec2.RunInstancesMonitoringEnabled{Enabled: aws.Bool(d.Monitoring)},
+			IamInstanceProfile: &ec2.IamInstanceProfileSpecification{
+				Name: &d.IamInstanceProfile,
+			},
+			EbsOptimized:        &d.UseEbsOptimizedInstance,
+			BlockDeviceMappings: bdmList,
+			UserData:            &userdata,
+			MetadataOptions: &ec2.InstanceMetadataOptionsRequest{},
+			InstanceMarketOptions: &ec2.InstanceMarketOptionsRequest{
+				MarketType: aws.String(ec2.MarketTypeSpot),
+				SpotOptions: &ec2.SpotMarketOptions{
+					MaxPrice: &d.SpotPrice,
+					SpotInstanceType: aws.String(ec2.SpotInstanceTypeOneTime),
+				},
+			},
 		}
 
-		spotInstanceRequest, err := d.getClient().RequestSpotInstances(&req)
+		if d.HttpEndpoint != "" {
+			req.MetadataOptions.HttpEndpoint = aws.String(d.HttpEndpoint)
+		}
+
+		if d.HttpTokens != "" {
+			req.MetadataOptions.HttpTokens = aws.String(d.HttpTokens)
+		}
+
+		if d.BlockDurationMinutes != 0 {
+			req.InstanceMarketOptions.SpotOptions.BlockDurationMinutes = &d.BlockDurationMinutes
+		}
+		res, err := d.getClient().RunInstances(&req)
 		if err != nil {
 			return fmt.Errorf("Error request spot instance: %s", err)
 		}
-		d.spotInstanceRequestId = *spotInstanceRequest.SpotInstanceRequests[0].SpotInstanceRequestId
+		d.spotInstanceRequestId = *res.Instances[0].SpotInstanceRequestId
 
 		log.Info("Waiting for spot instance...")
 		for i := 0; i < 3; i++ {
@@ -777,7 +791,7 @@ func (d *Driver) innerCreate() error {
 			ec2VolumeResource,   // EBS volume
 			ec2NetworkInterfaceResource,
 		})
-		inst, err := d.getClient().RunInstances(&ec2.RunInstancesInput{
+		req := ec2.RunInstancesInput{
 			ImageId:  &d.AMI,
 			MinCount: aws.Int64(1),
 			MaxCount: aws.Int64(1),
@@ -794,13 +808,24 @@ func (d *Driver) innerCreate() error {
 			EbsOptimized:        &d.UseEbsOptimizedInstance,
 			BlockDeviceMappings: bdmList,
 			UserData:            &userdata,
+			MetadataOptions: &ec2.InstanceMetadataOptionsRequest{},
 			TagSpecifications:   resourceTags,
-		})
+		}
+
+		if d.HttpEndpoint != "" {
+			req.MetadataOptions.HttpEndpoint = aws.String(d.HttpEndpoint)
+		}
+
+		if d.HttpTokens != "" {
+			req.MetadataOptions.HttpTokens = aws.String(d.HttpTokens)
+		}
+
+		res, err := d.getClient().RunInstances(&req)
 
 		if err != nil {
 			return fmt.Errorf("Error launching instance: %s", err)
 		}
-		instance = inst.Instances[0]
+		instance = res.Instances[0]
 	}
 
 	d.InstanceId = *instance.InstanceId
@@ -827,17 +852,6 @@ func (d *Driver) innerCreate() error {
 		// within the request
 		if err := d.configureTags(instance); err != nil {
 			return err
-		}
-	}
-
-	if d.HttpEndpoint != "" || d.HttpTokens != "" {
-		_, err := d.getClient().ModifyInstanceMetadataOptions(&ec2.ModifyInstanceMetadataOptionsInput{
-			InstanceId:   aws.String(d.InstanceId),
-			HttpEndpoint: aws.String(d.HttpEndpoint),
-			HttpTokens:   aws.String(d.HttpTokens),
-		})
-		if err != nil {
-			return fmt.Errorf("Error modifying instance metadata options for instance: %s", err)
 		}
 	}
 
