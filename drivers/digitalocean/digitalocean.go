@@ -38,12 +38,13 @@ type Driver struct {
 	UserDataFile      string
 	Monitoring        bool
 	Tags              string
+	PrivateIPAddress  string
 }
 
 const (
 	defaultSSHPort = 22
 	defaultSSHUser = "root"
-	defaultImage   = "ubuntu-16-04-x64"
+	defaultImage   = "ubuntu-20-04-x64"
 	defaultRegion  = "nyc3"
 	defaultSize    = "s-1vcpu-1gb"
 )
@@ -264,18 +265,22 @@ func (d *Driver) Create() error {
 			if network.Type == "public" {
 				d.IPAddress = network.IPAddress
 			}
+			if d.PrivateNetworking && network.Type == "private" {
+				d.PrivateIPAddress = network.IPAddress
+			}
 		}
 
-		if d.IPAddress != "" {
+		if d.IPAddress != "" && (!d.PrivateNetworking || d.PrivateIPAddress != "") {
 			break
 		}
 
 		time.Sleep(5 * time.Second)
 	}
 
-	log.Debugf("Created droplet ID %d, IP address %s",
+	log.Debugf("Created droplet ID %d, IP address %s, Private IP address %s",
 		newDroplet.ID,
-		d.IPAddress)
+		d.IPAddress,
+		d.PrivateIPAddress)
 
 	return nil
 }
