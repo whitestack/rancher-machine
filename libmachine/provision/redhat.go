@@ -115,13 +115,17 @@ func (provisioner *RedHatProvisioner) dockerDaemonResponding() bool {
 }
 
 func (provisioner *RedHatProvisioner) disableNetworkManagerSetupService8dot4() error {
-	if provisioner.OsReleaseInfo.VersionID != "8.4" {
+	// the service nm-cloud-setup.service and nm-cloud-setup.timer are seen on RHEL 8.4 and 8.6
+	if provisioner.OsReleaseInfo.ID != "rhel" {
 		return nil
 	}
 
 	log.Debug("Patching NetworkManager")
-	if _, err := provisioner.SSHCommand("sudo systemctl disable nm-cloud-setup.service nm-cloud-setup.timer"); err != nil {
-		return err
+	cmd := "sudo systemctl list-units --all | grep -Fq %s; if [ $? -eq 0 ]; then sudo systemctl disable %s; else echo 0; fi"
+	for _, service := range []string{"nm-cloud-setup.timer", "nm-cloud-setup.service"} {
+		if _, err := provisioner.SSHCommand(fmt.Sprintf(cmd, service, service)); err != nil {
+			return err
+		}
 	}
 
 	// ignore errors here because the SSH connection will close
