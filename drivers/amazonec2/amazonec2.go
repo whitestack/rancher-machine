@@ -647,9 +647,10 @@ func (d *Driver) Create() error {
 	// PreCreateCheck has already been called
 
 	if err := d.innerCreate(); err != nil {
+		log.Warnf("error encountered during instance creation: %s", err.Error())
 		// cleanup partially created resources
-		if err := d.Remove(); err != nil {
-			return err
+		if removalErr := d.Remove(); removalErr != nil {
+			return removalErr
 		}
 		return err
 	}
@@ -690,7 +691,7 @@ func (d *Driver) innerCreate() error {
 	var instance *ec2.Instance
 	if d.RequestSpotInstance {
 		req := ec2.RunInstancesInput{
-			ImageId: &d.AMI,
+			ImageId:  &d.AMI,
 			MinCount: aws.Int64(1),
 			MaxCount: aws.Int64(1),
 			Placement: &ec2.Placement{
@@ -706,11 +707,11 @@ func (d *Driver) innerCreate() error {
 			EbsOptimized:        &d.UseEbsOptimizedInstance,
 			BlockDeviceMappings: bdmList,
 			UserData:            &userdata,
-			MetadataOptions: &ec2.InstanceMetadataOptionsRequest{},
+			MetadataOptions:     &ec2.InstanceMetadataOptionsRequest{},
 			InstanceMarketOptions: &ec2.InstanceMarketOptionsRequest{
 				MarketType: aws.String(ec2.MarketTypeSpot),
 				SpotOptions: &ec2.SpotMarketOptions{
-					MaxPrice: &d.SpotPrice,
+					MaxPrice:         &d.SpotPrice,
 					SpotInstanceType: aws.String(ec2.SpotInstanceTypeOneTime),
 				},
 			},
@@ -808,7 +809,7 @@ func (d *Driver) innerCreate() error {
 			EbsOptimized:        &d.UseEbsOptimizedInstance,
 			BlockDeviceMappings: bdmList,
 			UserData:            &userdata,
-			MetadataOptions: &ec2.InstanceMetadataOptionsRequest{},
+			MetadataOptions:     &ec2.InstanceMetadataOptionsRequest{},
 			TagSpecifications:   resourceTags,
 		}
 
