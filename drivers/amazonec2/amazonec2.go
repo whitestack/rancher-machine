@@ -1578,14 +1578,22 @@ func (d *Driver) deleteKeyPair() error {
 
 	log.Debugf("deleting key pair: %s", d.KeyName)
 
+	var deleteInput ec2.DeleteKeyPairInput
 	instance, err := d.getInstance()
 	if err != nil {
-		return err
+		// do not return err as we may have generated a key
+		// but failed to create an instance. We still want to
+		// delete the key that we have stored locally
+		log.Infof("Could not retrieve EC2 instance while attempting key-pair deletion, will attempt to delete locally stored key %s", d.KeyName)
+		deleteInput.KeyName = &d.KeyName
+	} else {
+		// if we get an instance we should delete the
+		// returned key pair as it may have been changed
+		// outside of machine.
+		deleteInput.KeyName = instance.KeyName
 	}
 
-	_, err = d.getClient().DeleteKeyPair(&ec2.DeleteKeyPairInput{
-		KeyName: instance.KeyName,
-	})
+	_, err = d.getClient().DeleteKeyPair(&deleteInput)
 	if err != nil {
 		return err
 	}
