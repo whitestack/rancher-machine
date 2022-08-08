@@ -151,7 +151,7 @@ func (c *avSetCleanup) LogFields() logutil.Fields { return logutil.Fields{"name"
 
 func (c *avSetCleanup) CanBeDeleted(ctx context.Context, a AzureClient) bool {
 	c.Get(ctx, a) // updates c.ref
-	return c.ref.AvailabilitySetProperties.VirtualMachines == nil && len(*c.ref.AvailabilitySetProperties.VirtualMachines) == 0
+	return c.ref.AvailabilitySetProperties.VirtualMachines == nil || len(*c.ref.AvailabilitySetProperties.VirtualMachines) == 0
 }
 
 type nsgCleanup struct {
