@@ -65,6 +65,7 @@ const (
 	flAzureClientSecret      = "azure-client-secret"
 	flAzureNSG               = "azure-nsg"
 	flAzurePlan              = "azure-plan"
+	flAzureTags              = "azure-tags"
 )
 
 const (
@@ -99,6 +100,7 @@ type Driver struct {
 	UpdateCount     int
 	DiskSize        int
 	StorageType     string
+	Tags            map[string]*string
 
 	OpenPorts      []string
 	PrivateIPAddr  string
@@ -289,6 +291,11 @@ func (d *Driver) GetCreateFlags() []mcnflag.Flag {
 			Usage:  "Azure Service Principal Account password (optional, browser auth is used if not specified)",
 			EnvVar: "AZURE_CLIENT_SECRET",
 		},
+		mcnflag.StringFlag{
+			Name:   flAzureTags,
+			Usage:  "Tags to be applied to the Azure VM instance",
+			EnvVar: "AZURE_TAGS",
+		},
 	}
 }
 
@@ -323,6 +330,7 @@ func (d *Driver) SetConfigFromFlags(fl drivers.DriverOptions) error {
 	}
 
 	// Optional flags or Flags of other types
+	d.Tags = azureutil.BuildInstanceTags(fl.String(flAzureTags))
 	d.Environment = fl.String(flAzureEnvironment)
 	d.OpenPorts = fl.StringSlice(flAzurePorts)
 	d.PrivateIPAddr = fl.String(flAzurePrivateIPAddr)
@@ -467,7 +475,7 @@ func (d *Driver) Create() error {
 	}
 	if err := c.CreateVirtualMachine(ctx, d.ResourceGroup, d.naming().VM(), d.Location, d.Size, d.deploymentCtx.AvailabilitySetID,
 		d.deploymentCtx.NetworkInterfaceID, d.BaseDriver.SSHUser, d.deploymentCtx.SSHPublicKey, d.Image, d.Plan, customData, d.deploymentCtx.StorageAccount,
-		d.ManagedDisks, d.StorageType, int32(d.DiskSize)); err != nil {
+		d.ManagedDisks, d.StorageType, int32(d.DiskSize), d.Tags); err != nil {
 		return err
 	}
 	ip, err := d.GetIP()

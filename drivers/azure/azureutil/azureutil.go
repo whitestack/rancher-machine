@@ -559,7 +559,7 @@ func (a AzureClient) removeOSDiskBlob(ctx context.Context, resourceGroup, vmName
 // CreateVirtualMachine creates a VM according to the specifications and adds an SSH key to access the VM
 func (a AzureClient) CreateVirtualMachine(ctx context.Context, resourceGroup, name, location, size, availabilitySetID, networkInterfaceID,
 	username, sshPublicKey, imageName, imagePlan, customData string, storageAccount *storage.AccountProperties, isManaged bool,
-	storageType string, diskSize int32) error {
+	storageType string, diskSize int32, tags map[string]*string) error {
 	// TODO: "VM created from Image cannot have blob based disks. All disks have to be managed disks."
 	imgReference, err := a.getImageReference(ctx, imageName, location)
 	if err != nil {
@@ -609,6 +609,7 @@ func (a AzureClient) CreateVirtualMachine(ctx context.Context, resourceGroup, na
 	virtualMachinesClient := a.virtualMachinesClient()
 	future, err := virtualMachinesClient.CreateOrUpdate(ctx, resourceGroup, name,
 		compute.VirtualMachine{
+			Tags:     tags,
 			Location: to.StringPtr(location),
 			VirtualMachineProperties: &compute.VirtualMachineProperties{
 				AvailabilitySet: &compute.SubResource{
@@ -977,4 +978,22 @@ func extractStorageAccountFromVHDURL(vhdURL string) string {
 		return ""
 	}
 	return parts[0]
+}
+
+func BuildInstanceTags(tagGroups string) map[string]*string {
+	tags := make(map[string]*string)
+	if tagGroups == "" {
+		return tags
+	}
+
+	allTags := strings.Split(tagGroups, ",")
+	if len(allTags)%2 != 0 {
+		fmt.Printf("Tags are not in key value pairs. %d elements found\n", len(allTags))
+	}
+
+	for i := 0; i < len(allTags)-1; i += 2 {
+		tags[allTags[i]] = &allTags[i+1]
+	}
+
+	return tags
 }
