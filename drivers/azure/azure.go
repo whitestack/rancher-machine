@@ -36,36 +36,37 @@ const (
 )
 
 const (
-	flAzureEnvironment       = "azure-environment"
-	flAzureSubscriptionID    = "azure-subscription-id"
-	flAzureTenantID          = "azure-tenant-id"
-	flAzureResourceGroup     = "azure-resource-group"
-	flAzureSSHUser           = "azure-ssh-user"
-	flAzureDockerPort        = "azure-docker-port"
-	flAzureLocation          = "azure-location"
-	flAzureSize              = "azure-size"
-	flAzureImage             = "azure-image"
-	flAzureVNet              = "azure-vnet"
-	flAzureSubnet            = "azure-subnet"
-	flAzureSubnetPrefix      = "azure-subnet-prefix"
-	flAzureAvailabilitySet   = "azure-availability-set"
-	flAzureManagedDisks      = "azure-managed-disks"
-	flAzureFaultDomainCount  = "azure-fault-domain-count"
-	flAzureUpdateDomainCount = "azure-update-domain-count"
-	flAzureDiskSize          = "azure-disk-size"
-	flAzurePorts             = "azure-open-port"
-	flAzurePrivateIPAddr     = "azure-private-ip-address"
-	flAzureUsePrivateIP      = "azure-use-private-ip"
-	flAzureStaticPublicIP    = "azure-static-public-ip"
-	flAzureNoPublicIP        = "azure-no-public-ip"
-	flAzureDNSLabel          = "azure-dns"
-	flAzureStorageType       = "azure-storage-type"
-	flAzureCustomData        = "azure-custom-data"
-	flAzureClientID          = "azure-client-id"
-	flAzureClientSecret      = "azure-client-secret"
-	flAzureNSG               = "azure-nsg"
-	flAzurePlan              = "azure-plan"
-	flAzureTags              = "azure-tags"
+	flAzureEnvironment           = "azure-environment"
+	flAzureSubscriptionID        = "azure-subscription-id"
+	flAzureTenantID              = "azure-tenant-id"
+	flAzureResourceGroup         = "azure-resource-group"
+	flAzureSSHUser               = "azure-ssh-user"
+	flAzureDockerPort            = "azure-docker-port"
+	flAzureLocation              = "azure-location"
+	flAzureSize                  = "azure-size"
+	flAzureImage                 = "azure-image"
+	flAzureVNet                  = "azure-vnet"
+	flAzureSubnet                = "azure-subnet"
+	flAzureSubnetPrefix          = "azure-subnet-prefix"
+	flAzureAvailabilitySet       = "azure-availability-set"
+	flAzureManagedDisks          = "azure-managed-disks"
+	flAzureFaultDomainCount      = "azure-fault-domain-count"
+	flAzureUpdateDomainCount     = "azure-update-domain-count"
+	flAzureDiskSize              = "azure-disk-size"
+	flAzurePorts                 = "azure-open-port"
+	flAzurePrivateIPAddr         = "azure-private-ip-address"
+	flAzureUsePrivateIP          = "azure-use-private-ip"
+	flAzureStaticPublicIP        = "azure-static-public-ip"
+	flAzureNoPublicIP            = "azure-no-public-ip"
+	flAzureDNSLabel              = "azure-dns"
+	flAzureStorageType           = "azure-storage-type"
+	flAzureCustomData            = "azure-custom-data"
+	flAzureClientID              = "azure-client-id"
+	flAzureClientSecret          = "azure-client-secret"
+	flAzureNSG                   = "azure-nsg"
+	flAzurePlan                  = "azure-plan"
+	flAzureTags                  = "azure-tags"
+	flAzureAcceleratedNetworking = "azure-accelerated-networking"
 )
 
 const (
@@ -85,22 +86,23 @@ type Driver struct {
 	TenantID       string
 	ResourceGroup  string
 
-	DockerPort      int
-	Location        string
-	Size            string
-	Image           string
-	VirtualNetwork  string
-	SubnetName      string
-	SubnetPrefix    string
-	AvailabilitySet string
-	NSG             string
-	Plan            string
-	ManagedDisks    bool
-	FaultCount      int
-	UpdateCount     int
-	DiskSize        int
-	StorageType     string
-	Tags            map[string]*string
+	DockerPort            int
+	Location              string
+	Size                  string
+	Image                 string
+	VirtualNetwork        string
+	SubnetName            string
+	SubnetPrefix          string
+	AvailabilitySet       string
+	NSG                   string
+	Plan                  string
+	ManagedDisks          bool
+	FaultCount            int
+	UpdateCount           int
+	DiskSize              int
+	StorageType           string
+	Tags                  map[string]*string
+	AcceleratedNetworking bool
 
 	OpenPorts      []string
 	PrivateIPAddr  string
@@ -331,6 +333,7 @@ func (d *Driver) SetConfigFromFlags(fl drivers.DriverOptions) error {
 
 	// Optional flags or Flags of other types
 	d.Tags = azureutil.BuildInstanceTags(fl.String(flAzureTags))
+	d.AcceleratedNetworking = fl.Bool(flAzureAcceleratedNetworking)
 	d.Environment = fl.String(flAzureEnvironment)
 	d.OpenPorts = fl.StringSlice(flAzurePorts)
 	d.PrivateIPAddr = fl.String(flAzurePrivateIPAddr)
@@ -461,7 +464,7 @@ func (d *Driver) Create() error {
 		}
 	}
 	if err := c.CreateNetworkInterface(ctx, d.deploymentCtx, d.ResourceGroup, d.naming().NIC(), d.Location,
-		d.deploymentCtx.PublicIPAddressID, d.deploymentCtx.SubnetID, d.deploymentCtx.NetworkSecurityGroupID, d.PrivateIPAddr); err != nil {
+		d.deploymentCtx.PublicIPAddressID, d.deploymentCtx.SubnetID, d.deploymentCtx.NetworkSecurityGroupID, d.PrivateIPAddr, d.AcceleratedNetworking); err != nil {
 		return err
 	}
 	if !d.ManagedDisks {
