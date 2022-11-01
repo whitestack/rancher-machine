@@ -160,7 +160,7 @@ func (a AzureClient) DeleteNetworkSecurityGroupIfExists(ctx context.Context, res
 }
 
 // CreatePublicIPAddress creates a public IP address and adds it to our DeploymentContext
-func (a AzureClient) CreatePublicIPAddress(ctx context.Context, deploymentCtx *DeploymentContext, resourceGroup, name, location string, isStatic bool, dnsLabel string) error {
+func (a AzureClient) CreatePublicIPAddress(ctx context.Context, deploymentCtx *DeploymentContext, resourceGroup, name, location string, isStatic bool, dnsLabel string, enablePublicIPStandardSKU bool) error {
 	log.Info("Creating public IP address.", logutil.Fields{
 		"name":   name,
 		"static": isStatic})
@@ -179,15 +179,19 @@ func (a AzureClient) CreatePublicIPAddress(ctx context.Context, deploymentCtx *D
 		}
 	}
 
+	publicIP := network.PublicIPAddress{
+		Location: to.StringPtr(location),
+		PublicIPAddressPropertiesFormat: &network.PublicIPAddressPropertiesFormat{
+			PublicIPAllocationMethod: ipType,
+			DNSSettings:              dns,
+		},
+	}
+	if enablePublicIPStandardSKU {
+		publicIP.Sku = &network.PublicIPAddressSku{Name: network.PublicIPAddressSkuNameStandard}
+	}
+
 	publicIPAddressClient := a.publicIPAddressClient()
-	future, err := publicIPAddressClient.CreateOrUpdate(ctx, resourceGroup, name,
-		network.PublicIPAddress{
-			Location: to.StringPtr(location),
-			PublicIPAddressPropertiesFormat: &network.PublicIPAddressPropertiesFormat{
-				PublicIPAllocationMethod: ipType,
-				DNSSettings:              dns,
-			},
-		})
+	future, err := publicIPAddressClient.CreateOrUpdate(ctx, resourceGroup, name, publicIP)
 	if err != nil {
 		return err
 	}
@@ -560,7 +564,7 @@ func (a AzureClient) removeOSDiskBlob(ctx context.Context, resourceGroup, vmName
 // CreateVirtualMachine creates a VM according to the specifications and adds an SSH key to access the VM
 func (a AzureClient) CreateVirtualMachine(ctx context.Context, resourceGroup, name, location, size, availabilitySetID, networkInterfaceID,
 	username, sshPublicKey, imageName, imagePlan, customData string, storageAccount *storage.AccountProperties, isManaged bool,
-	storageType string, diskSize int32, tags map[string]*string) error {
+	storageType string, diskSize int32, tags map[string]*string, availabilityZone string) error {
 	// TODO: "VM created from Image cannot have blob based disks. All disks have to be managed disks."
 	imgReference, err := a.getImageReference(ctx, imageName, location)
 	if err != nil {
@@ -608,32 +612,43 @@ func (a AzureClient) CreateVirtualMachine(ctx context.Context, resourceGroup, na
 	}
 
 	virtualMachinesClient := a.virtualMachinesClient()
-	future, err := virtualMachinesClient.CreateOrUpdate(ctx, resourceGroup, name,
-		compute.VirtualMachine{
-			Tags:     tags,
-			Location: to.StringPtr(location),
-			VirtualMachineProperties: &compute.VirtualMachineProperties{
-				AvailabilitySet: &compute.SubResource{
-					ID: to.StringPtr(availabilitySetID),
-				},
-				HardwareProfile: &compute.HardwareProfile{
-					VMSize: compute.VirtualMachineSizeTypes(size),
-				},
-				NetworkProfile: &compute.NetworkProfile{
-					NetworkInterfaces: &[]compute.NetworkInterfaceReference{
-						{
-							ID: to.StringPtr(networkInterfaceID),
-						},
+
+	vm := compute.VirtualMachine{
+		Tags:     tags,
+		Location: to.StringPtr(location),
+		VirtualMachineProperties: &compute.VirtualMachineProperties{
+			HardwareProfile: &compute.HardwareProfile{
+				VMSize: compute.VirtualMachineSizeTypes(size),
+			},
+			NetworkProfile: &compute.NetworkProfile{
+				NetworkInterfaces: &[]compute.NetworkInterfaceReference{
+					{
+						ID: to.StringPtr(networkInterfaceID),
 					},
 				},
-				OsProfile: osProfile,
-				StorageProfile: &compute.StorageProfile{
-					ImageReference: imgReference,
-					OsDisk:         getOSDisk(name, storageAccount, isManaged, storageType, diskSize),
-				},
 			},
-			Plan: imagePurchasePlan,
-		})
+			OsProfile: osProfile,
+			StorageProfile: &compute.StorageProfile{
+				ImageReference: imgReference,
+				OsDisk:         getOSDisk(name, storageAccount, isManaged, storageType, diskSize),
+			},
+		},
+		Plan: imagePurchasePlan,
+	}
+
+	// The Azure API does not allow you to specify particular Availability Sets
+	// in particular Availability Zones - you can only specify one or the other.
+	// if a user has provided an availability zone it is assumed that
+	// no availability sets should be created / used.
+	if availabilityZone == "" {
+		vm.VirtualMachineProperties.AvailabilitySet = &compute.SubResource{
+			ID: to.StringPtr(availabilitySetID),
+		}
+	} else {
+		vm.Zones = to.StringSlicePtr([]string{availabilityZone})
+	}
+
+	future, err := virtualMachinesClient.CreateOrUpdate(ctx, resourceGroup, name, vm)
 	if err != nil {
 		return err
 	}
