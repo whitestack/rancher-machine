@@ -523,7 +523,7 @@ func updateUserdataFile(driverOpts *rpcdriver.RPCFlags, machineName, userdataFla
 
 	modifiedUserdataFile, err := ioutil.TempFile("", "modified-user-data")
 	if err != nil {
-		return fmt.Errorf("[updateUserdataFile] unable to created tempfile [%v]\nError returned\n[%v]", modifiedUserdataFile, err)
+		return fmt.Errorf("[updateUserdataFile] unable to create tempfile [%v]\nError returned\n[%v]", modifiedUserdataFile, err)
 	}
 	defer modifiedUserdataFile.Close()
 
@@ -543,6 +543,7 @@ func updateUserdataFile(driverOpts *rpcdriver.RPCFlags, machineName, userdataFla
 func writeCloudConfig(machineName, encodedData, machineOS string, cf map[interface{}]interface{}, newUserDataFile *os.File) error {
 	command := "sh"
 	path := "/usr/local/custom_script/install.sh"
+	key := "hostname"
 	if strings.Contains(machineOS, "windows") {
 		// the writeFile path should ideally be C:\usr\local\custom_script\install.ps1
 		// however, we can't guarantee that directory exists or can be created on the target machine
@@ -551,37 +552,32 @@ func writeCloudConfig(machineName, encodedData, machineOS string, cf map[interfa
 		// set_hostname is a cloudbase-init specific cloud-config parameter
 		// that is only pertinent for windows VMs
 		// https://cloudbase-init.readthedocs.io/en/latest/userdata.html
-		if err := addToCloudConfig(cf, "set_hostname", machineName); err != nil {
-			log.Debugf("[writeCloudConfig] wrote set_hostname field for %s machine %s", machineName, machineOS)
-			return err
-		}
-	} else {
-		// Add the hostname
-		if _, ok := cf["hostname"]; !ok {
-			cf["hostname"] = machineName
-			log.Debugf("[writeCloudConfig] wrote hostname field for %s machine %s", machineName, machineOS)
-		}
+		key = "set_hostname"
 	}
-	return commonCloudConfig(machineName, machineOS, encodedData, command, path, cf, newUserDataFile)
+	if _, ok := cf[key]; !ok {
+		cf[key] = machineName
+		log.Debugf("[writeCloudConfig] wrote %s field for %s machine %s", key, machineOS, machineName)
+	}
+	return commonCloudConfig(encodedData, command, path, cf, newUserDataFile)
 }
 
 // commonCloudConfig contains the shared cloud-config logic for writeCloudConfig
 // it adds content to the write_files directive of the cloud-config file as well as sets the hostname
 // the content added is based on the OS passed with a hard default to linux
 // windows is the only other supported OS
-func commonCloudConfig(machineName, machineOS, encodedData, command, path string, cf map[interface{}]interface{}, newUserDataFile *os.File) error {
+func commonCloudConfig(encodedData, command, path string, cf map[interface{}]interface{}, newUserDataFile *os.File) error {
 	writeFile := map[string]string{
 		"encoding":    "gzip+b64",
 		"content":     fmt.Sprintf("%s", encodedData),
 		"permissions": "0644",
 		"path":        path,
 	}
-	if err := addToCloudConfig(cf, "write_files", writeFile); err != nil {
+	if err := appendValueToListInCloudConfig(cf, "write_files", writeFile); err != nil {
 		return err
 	}
 
 	// Add to the runcmd directive
-	if err := addToCloudConfig(cf, "runcmd", fmt.Sprintf("%s %s", command, writeFile["path"])); err != nil {
+	if err := appendValueToListInCloudConfig(cf, "runcmd", fmt.Sprintf("%s %s", command, writeFile["path"])); err != nil {
 		return err
 	}
 
@@ -639,8 +635,8 @@ func replaceUserdataFile(machineName, machineOS string, userdataContent, customS
 	return writeCloudConfig(machineName, encodedData, machineOS, cf, newUserDataFile)
 }
 
-// addToCloudConfig lets you easily add key:value pairs to the cloud-config file
-func addToCloudConfig(cf map[interface{}]interface{}, key string, value interface{}) error {
+// appendValueToListInCloudConfig appends a value to a list or creates one if it does not exist at the given key within the cloud config
+func appendValueToListInCloudConfig(cf map[interface{}]interface{}, key string, value interface{}) error {
 	switch section := cf[key].(type) {
 	case []interface{}:
 		section = append(section, value)
