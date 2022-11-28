@@ -9,15 +9,15 @@ import (
 	"net"
 	"net/url"
 	"os"
+	"strconv"
 
+	"github.com/Azure/azure-sdk-for-go/services/storage/mgmt/2019-06-01/storage"
+	"github.com/Azure/go-autorest/autorest/azure"
 	"github.com/rancher/machine/drivers/azure/azureutil"
 	"github.com/rancher/machine/libmachine/drivers"
 	"github.com/rancher/machine/libmachine/log"
 	"github.com/rancher/machine/libmachine/mcnflag"
 	"github.com/rancher/machine/libmachine/state"
-
-	"github.com/Azure/azure-sdk-for-go/services/storage/mgmt/2019-06-01/storage"
-	"github.com/Azure/go-autorest/autorest/azure"
 )
 
 const (
@@ -36,35 +36,39 @@ const (
 )
 
 const (
-	flAzureEnvironment       = "azure-environment"
-	flAzureSubscriptionID    = "azure-subscription-id"
-	flAzureTenantID          = "azure-tenant-id"
-	flAzureResourceGroup     = "azure-resource-group"
-	flAzureSSHUser           = "azure-ssh-user"
-	flAzureDockerPort        = "azure-docker-port"
-	flAzureLocation          = "azure-location"
-	flAzureSize              = "azure-size"
-	flAzureImage             = "azure-image"
-	flAzureVNet              = "azure-vnet"
-	flAzureSubnet            = "azure-subnet"
-	flAzureSubnetPrefix      = "azure-subnet-prefix"
-	flAzureAvailabilitySet   = "azure-availability-set"
-	flAzureManagedDisks      = "azure-managed-disks"
-	flAzureFaultDomainCount  = "azure-fault-domain-count"
-	flAzureUpdateDomainCount = "azure-update-domain-count"
-	flAzureDiskSize          = "azure-disk-size"
-	flAzurePorts             = "azure-open-port"
-	flAzurePrivateIPAddr     = "azure-private-ip-address"
-	flAzureUsePrivateIP      = "azure-use-private-ip"
-	flAzureStaticPublicIP    = "azure-static-public-ip"
-	flAzureNoPublicIP        = "azure-no-public-ip"
-	flAzureDNSLabel          = "azure-dns"
-	flAzureStorageType       = "azure-storage-type"
-	flAzureCustomData        = "azure-custom-data"
-	flAzureClientID          = "azure-client-id"
-	flAzureClientSecret      = "azure-client-secret"
-	flAzureNSG               = "azure-nsg"
-	flAzurePlan              = "azure-plan"
+	flAzureEnvironment               = "azure-environment"
+	flAzureSubscriptionID            = "azure-subscription-id"
+	flAzureTenantID                  = "azure-tenant-id"
+	flAzureResourceGroup             = "azure-resource-group"
+	flAzureSSHUser                   = "azure-ssh-user"
+	flAzureDockerPort                = "azure-docker-port"
+	flAzureLocation                  = "azure-location"
+	flAzureSize                      = "azure-size"
+	flAzureImage                     = "azure-image"
+	flAzureVNet                      = "azure-vnet"
+	flAzureSubnet                    = "azure-subnet"
+	flAzureSubnetPrefix              = "azure-subnet-prefix"
+	flAzureAvailabilitySet           = "azure-availability-set"
+	flAzureManagedDisks              = "azure-managed-disks"
+	flAzureFaultDomainCount          = "azure-fault-domain-count"
+	flAzureUpdateDomainCount         = "azure-update-domain-count"
+	flAzureDiskSize                  = "azure-disk-size"
+	flAzurePorts                     = "azure-open-port"
+	flAzurePrivateIPAddr             = "azure-private-ip-address"
+	flAzureUsePrivateIP              = "azure-use-private-ip"
+	flAzureStaticPublicIP            = "azure-static-public-ip"
+	flAzureNoPublicIP                = "azure-no-public-ip"
+	flAzureDNSLabel                  = "azure-dns"
+	flAzureStorageType               = "azure-storage-type"
+	flAzureCustomData                = "azure-custom-data"
+	flAzureClientID                  = "azure-client-id"
+	flAzureClientSecret              = "azure-client-secret"
+	flAzureNSG                       = "azure-nsg"
+	flAzurePlan                      = "azure-plan"
+	flAzureTags                      = "azure-tags"
+	flAzureAcceleratedNetworking     = "azure-accelerated-networking"
+	flAzureEnablePublicIPStandardSKU = "azure-enable-public-ip-standard-sku"
+	flAzureAvailabilityZones         = "azure-availability-zone"
 )
 
 const (
@@ -84,21 +88,25 @@ type Driver struct {
 	TenantID       string
 	ResourceGroup  string
 
-	DockerPort      int
-	Location        string
-	Size            string
-	Image           string
-	VirtualNetwork  string
-	SubnetName      string
-	SubnetPrefix    string
-	AvailabilitySet string
-	NSG             string
-	Plan            string
-	ManagedDisks    bool
-	FaultCount      int
-	UpdateCount     int
-	DiskSize        int
-	StorageType     string
+	DockerPort                int
+	Location                  string
+	Size                      string
+	Image                     string
+	VirtualNetwork            string
+	SubnetName                string
+	SubnetPrefix              string
+	AvailabilitySet           string
+	NSG                       string
+	Plan                      string
+	ManagedDisks              bool
+	FaultCount                int
+	UpdateCount               int
+	DiskSize                  int
+	StorageType               string
+	Tags                      map[string]*string
+	AcceleratedNetworking     bool
+	AvailabilityZone          string
+	EnablePublicIPStandardSKU bool
 
 	OpenPorts      []string
 	PrivateIPAddr  string
@@ -289,6 +297,21 @@ func (d *Driver) GetCreateFlags() []mcnflag.Flag {
 			Usage:  "Azure Service Principal Account password (optional, browser auth is used if not specified)",
 			EnvVar: "AZURE_CLIENT_SECRET",
 		},
+		mcnflag.StringFlag{
+			Name:   flAzureTags,
+			Usage:  "Tags to be applied to the Azure VM instance",
+			EnvVar: "AZURE_TAGS",
+		},
+		mcnflag.StringFlag{
+			Name:   flAzureAvailabilityZones,
+			Usage:  "Specify the Availability Zones the Azure resources should be created in",
+			EnvVar: "AZURE_AVAILABILITY_ZONE",
+		},
+		mcnflag.BoolFlag{
+			Name:   flAzureEnablePublicIPStandardSKU,
+			Usage:  "Specify if a Standard SKU should be used for the Public IP of the Azure VM",
+			EnvVar: "AZURE_STANDARD_PUBLIC_IP_SKU",
+		},
 	}
 }
 
@@ -323,6 +346,10 @@ func (d *Driver) SetConfigFromFlags(fl drivers.DriverOptions) error {
 	}
 
 	// Optional flags or Flags of other types
+	d.AvailabilityZone = fl.String(flAzureAvailabilityZones)
+	d.EnablePublicIPStandardSKU = fl.Bool(flAzureEnablePublicIPStandardSKU)
+	d.Tags = azureutil.BuildInstanceTags(fl.String(flAzureTags))
+	d.AcceleratedNetworking = fl.Bool(flAzureAcceleratedNetworking)
 	d.Environment = fl.String(flAzureEnvironment)
 	d.OpenPorts = fl.StringSlice(flAzurePorts)
 	d.PrivateIPAddr = fl.String(flAzurePrivateIPAddr)
@@ -359,6 +386,21 @@ func (d *Driver) PreCreateCheck() (err error) {
 	if d.CustomDataFile != "" {
 		if _, err := os.Stat(d.CustomDataFile); os.IsNotExist(err) {
 			return fmt.Errorf("custom-data file %s could not be found", d.CustomDataFile)
+		}
+	}
+
+	if d.AvailabilityZone != "" {
+		if !d.ManagedDisks {
+			return fmt.Errorf("Managed Disks must be used when creating resources in specific Availability Zones (--azure-managed-disks)")
+		}
+		if v, err := strconv.Atoi(d.AvailabilityZone); err != nil || v == 0 {
+			return fmt.Errorf("Each VM can only be assigned to a single Availability Zone. Each zone is denoted by an integer greater than 0")
+		}
+		if !d.EnablePublicIPStandardSKU {
+			return fmt.Errorf("The Standard Public IP SKU must be enabled when creating resources in specific Availablity Zones (--azure-enable-public-ip-standard-sku)")
+		}
+		if d.AvailabilitySet != "" {
+			log.Warn("Both an Availability Set and Availability Zone were specified. Skipping creation of the Availability Set, only creating resources in the specified Availability Zone.")
 		}
 	}
 
@@ -432,8 +474,11 @@ func (d *Driver) Create() error {
 	if err := c.CreateResourceGroup(ctx, d.ResourceGroup, d.Location); err != nil {
 		return err
 	}
-	if err := c.CreateAvailabilitySetIfNotExists(ctx, d.deploymentCtx, d.ResourceGroup, d.AvailabilitySet, d.Location, d.ManagedDisks, int32(d.FaultCount), int32(d.UpdateCount)); err != nil {
-		return err
+	// availability sets and availability zones cannot be used together. The presence of an Availability Zone indicates that an Availability set should not be created / used
+	if d.AvailabilityZone == "" {
+		if err := c.CreateAvailabilitySetIfNotExists(ctx, d.deploymentCtx, d.ResourceGroup, d.AvailabilitySet, d.Location, d.ManagedDisks, int32(d.FaultCount), int32(d.UpdateCount)); err != nil {
+			return err
+		}
 	}
 	if err := c.CreateNetworkSecurityGroup(ctx, d.deploymentCtx, d.ResourceGroup, d.nsgResource, d.Location, d.nsgUsedInPool, d.deploymentCtx.FirewallRules); err != nil {
 		return err
@@ -448,12 +493,12 @@ func (d *Driver) Create() error {
 	if d.NoPublicIP {
 		log.Info("Not creating a public IP address.")
 	} else {
-		if err := c.CreatePublicIPAddress(ctx, d.deploymentCtx, d.ResourceGroup, d.naming().IP(), d.Location, d.StaticPublicIP, d.DNSLabel); err != nil {
+		if err := c.CreatePublicIPAddress(ctx, d.deploymentCtx, d.ResourceGroup, d.naming().IP(), d.Location, d.StaticPublicIP, d.DNSLabel, d.EnablePublicIPStandardSKU); err != nil {
 			return err
 		}
 	}
 	if err := c.CreateNetworkInterface(ctx, d.deploymentCtx, d.ResourceGroup, d.naming().NIC(), d.Location,
-		d.deploymentCtx.PublicIPAddressID, d.deploymentCtx.SubnetID, d.deploymentCtx.NetworkSecurityGroupID, d.PrivateIPAddr); err != nil {
+		d.deploymentCtx.PublicIPAddressID, d.deploymentCtx.SubnetID, d.deploymentCtx.NetworkSecurityGroupID, d.PrivateIPAddr, d.AcceleratedNetworking); err != nil {
 		return err
 	}
 	if !d.ManagedDisks {
@@ -467,7 +512,7 @@ func (d *Driver) Create() error {
 	}
 	if err := c.CreateVirtualMachine(ctx, d.ResourceGroup, d.naming().VM(), d.Location, d.Size, d.deploymentCtx.AvailabilitySetID,
 		d.deploymentCtx.NetworkInterfaceID, d.BaseDriver.SSHUser, d.deploymentCtx.SSHPublicKey, d.Image, d.Plan, customData, d.deploymentCtx.StorageAccount,
-		d.ManagedDisks, d.StorageType, int32(d.DiskSize)); err != nil {
+		d.ManagedDisks, d.StorageType, int32(d.DiskSize), d.Tags, d.AvailabilityZone); err != nil {
 		return err
 	}
 	ip, err := d.GetIP()
@@ -514,8 +559,11 @@ func (d *Driver) Remove() error {
 	if err := c.DeleteNetworkSecurityGroupIfExists(ctx, d.nsgResource, d.nsgUsedInPool); err != nil {
 		return err
 	}
-	if err := c.CleanupAvailabilitySetIfExists(ctx, d.ResourceGroup, d.AvailabilitySet); err != nil {
-		return err
+	// availability sets and availability zones cannot be used together. The absence of any Availability Zones indicates that an Availability set was created and should be deleted.
+	if d.AvailabilityZone == "" {
+		if err := c.CleanupAvailabilitySetIfExists(ctx, d.ResourceGroup, d.AvailabilitySet); err != nil {
+			return err
+		}
 	}
 	if err := c.CleanupSubnetIfExists(ctx, d.ResourceGroup, d.VirtualNetwork, d.SubnetName); err != nil {
 		return err
