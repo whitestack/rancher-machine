@@ -312,6 +312,11 @@ func (d *Driver) GetCreateFlags() []mcnflag.Flag {
 			Usage:  "Specify if a Standard SKU should be used for the Public IP of the Azure VM",
 			EnvVar: "AZURE_STANDARD_PUBLIC_IP_SKU",
 		},
+		mcnflag.BoolFlag{
+			Name:   flAzureAcceleratedNetworking,
+			Usage:  "Specify if an Accelerated Networking NIC should be created for your VM",
+			EnvVar: "AZURE_ACCELERATED_NETWORKING",
+		},
 	}
 }
 
