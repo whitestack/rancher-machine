@@ -177,7 +177,7 @@ func (api *Client) performCreate(h *host.Host) error {
 	log.Infof("Provisioning with %s...", provisioner.String())
 	if h.HostOptions.CustomInstallScript != "" {
 		log.Infof("Provisioning with custom install script via SSH, not installing Docker...")
-		return provision.WithCustomScript(provisioner, h.HostOptions.CustomInstallScript)
+		return provision.WithCustomScript(provisioner, h.HostOptions.CustomInstallScript, h.HostOptions.HostnameOverride)
 	} else {
 		if err := provisioner.Provision(*h.HostOptions.SwarmOptions, *h.HostOptions.AuthOptions, *h.HostOptions.EngineOptions); err != nil {
 			return err
