@@ -2,17 +2,21 @@ package provision
 
 import (
 	"fmt"
-	"io/ioutil"
+	"os"
 
 	"github.com/rancher/machine/libmachine/provision/pkgaction"
 )
 
-func WithCustomScript(provisioner Provisioner, customScriptPath string) error {
+func WithCustomScript(provisioner Provisioner, customScriptPath, hostname string) error {
 	if provisioner == nil {
 		return nil
 	}
 
-	if err := provisioner.SetHostname(provisioner.GetDriver().GetMachineName()); err != nil {
+	if hostname == "" {
+		hostname = provisioner.GetDriver().GetMachineName()
+	}
+
+	if err := provisioner.SetHostname(hostname); err != nil {
 		return err
 	}
 
@@ -22,7 +26,7 @@ func WithCustomScript(provisioner Provisioner, customScriptPath string) error {
 		}
 	}
 
-	customScriptContents, err := ioutil.ReadFile(customScriptPath)
+	customScriptContents, err := os.ReadFile(customScriptPath)
 	if err != nil {
 		return fmt.Errorf("unable to read file %s: %v", customScriptPath, err)
 	}
