@@ -73,10 +73,10 @@ func (c *GenericClient) CreateInstance(d *Driver) (string, error) {
 	var networks []servers.Network
 	if len(d.NetworkIds) > 0 {
 		networks = make([]servers.Network, len(d.NetworkIds))
-		for _, nID := range d.NetworkIds {
-			networks = append(networks, servers.Network{
+		for i, nID := range d.NetworkIds {
+			networks[i] = servers.Network{
 				UUID: nID,
-			})
+			}
 		}
 	}
 
