@@ -200,7 +200,7 @@ func (d *Driver) GetCreateFlags() []mcnflag.Flag {
 		mcnflag.IntFlag{
 			EnvVar: "VSPHERE_GRACEFUL_SHUTDOWN_TIMEOUT",
 			Name:   "vmwarevsphere-graceful-shutdown-timeout",
-			Usage:  "how many seconds to wait before timing out when attempting a graceful shutdown for a vSphere virtual machine. A force destroy will perform when the value is zero.",
+			Usage:  "How many seconds to wait before timing out when attempting a graceful shutdown for a vSphere virtual machine. A force destroy will perform when the value is zero.",
 		},
 	}
 }
