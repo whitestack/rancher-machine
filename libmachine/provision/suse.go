@@ -119,7 +119,7 @@ func (provisioner *SUSEProvisioner) Provision(swarmOptions swarm.Options, authOp
 			return err
 		}
 	}
-	graphDriver := "overlay"
+	graphDriver := DefaultStorageDriver
 	if strings.Contains(fs, "btrfs") {
 		graphDriver = "btrfs"
 	}
