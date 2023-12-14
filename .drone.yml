@@ -175,92 +175,6 @@ volumes:
 ---
 
 kind: pipeline
-name: s390x
-
-platform:
-  os: linux
-  arch: amd64
-
-node:
-  arch: s390x
-
-clone:
-  disable: true
-
-steps:
-  - name: clone
-    pull: if-not-exists
-    image: alpine/git:v2.30.2-s390x
-    commands:
-      - git clone $DRONE_GIT_HTTP_URL  .
-      - git fetch origin $DRONE_COMMIT_REF
-      - git checkout $DRONE_COMMIT -b origin/$DRONE_TARGET_BRANCH
-
-  - name: build
-    pull: default
-    image: rancher/dapper:v0.5.8
-    commands:
-      - dapper ci
-    privileged: true
-    volumes:
-      - name: docker
-        path: /var/run/docker.sock
-    when:
-      event:
-        - tag
-        - pull_request
-
-  - name: github_binary_release
-    image: rancher/drone-images:github-release-s390x
-    settings:
-      api_key:
-        from_secret: github_token
-      files:
-      - "dist/artifacts/*"
-    when:
-      instance:
-      - drone-publish.rancher.io
-      ref:
-      - refs/head/master
-      - refs/tags/*
-      event:
-      - tag
-
-  - name: stage-binaries
-    image: rancher/dapper:v0.5.8
-    commands:
-      - "cp -r ./bin/* ./package/"
-    when:
-      event:
-        - tag
-
-  - name: docker-publish
-    image: rancher/drone-images:docker-s390x
-    volumes:
-      - name: docker
-        path: /var/run/docker.sock
-    settings:
-      purge: false
-      context: package/
-      dockerfile: package/Dockerfile
-      password:
-        from_secret: docker_password
-      repo: rancher/machine
-      tag: "${DRONE_TAG}-s390x"
-      username:
-        from_secret: docker_username
-    when:
-      event:
-        - tag
-
-volumes:
-  - name: docker
-    host:
-      path: /var/run/docker.sock
-
----
-
-kind: pipeline
 type: docker
 name: manifest
 
@@ -275,7 +189,6 @@ steps:
       platforms:
         - linux/amd64
         - linux/arm64
-        - linux/s390x
       target: "rancher/machine:${DRONE_TAG}"
       template: "rancher/machine:${DRONE_TAG}-ARCH"
     when:
@@ -294,4 +207,3 @@ trigger:
 depends_on:
   - amd64
   - arm64
-  - s390x
