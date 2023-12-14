@@ -270,6 +270,16 @@ func checkDaemonUp(p Provisioner, dockerPort int) func() bool {
 	}
 }
 
+// waitForCloudInit runs `cloud-init status --wait` on the node in order to wait for the node to be ready before
+// continuing execution.
+func waitForCloudInit(p Provisioner) error {
+	_, err := p.SSHCommand("sudo cloud-init status --wait")
+	if err != nil {
+		return fmt.Errorf("failed to wait for cloud-init: %w", err)
+	}
+	return nil
+}
+
 func WaitForDocker(p Provisioner, dockerPort int) error {
 	if err := mcnutils.WaitForSpecific(checkDaemonUp(p, dockerPort), 10, 3*time.Second); err != nil {
 		return NewErrDaemonAvailable(err)

@@ -102,6 +102,12 @@ func (provisioner *UbuntuSystemdProvisioner) Provision(swarmOptions swarm.Option
 	provisioner.EngineOptions = engineOptions
 	swarmOptions.Env = engineOptions.Env
 
+	log.Debug("waiting for cloud-init to complete")
+	err := waitForCloudInit(provisioner)
+	if err != nil {
+		return err
+	}
+
 	storageDriver, err := decideStorageDriver(provisioner, DefaultStorageDriver, engineOptions.StorageDriver)
 	if err != nil {
 		return err
