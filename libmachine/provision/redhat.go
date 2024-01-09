@@ -129,9 +129,9 @@ func (provisioner *RedHatProvisioner) disableNetworkManagerSetupService8dot4() e
 	}
 
 	// ignore errors here because the SSH connection will close
-	provisioner.SSHCommand("[ -f /tmp/rancher-machine-reboot ] && rm -f /tmp/rancher-machine-reboot && sudo reboot")
+	output, _ := provisioner.SSHCommand("if [ -f /tmp/rancher-machine-reboot ]; then echo NetworkManager is patched, waiting for machine to reboot && rm -f /tmp/rancher-machine-reboot && sudo reboot; else echo NetworkManager has been disabled, nothing to do; fi")
+	log.Debug(output)
 
-	log.Debug("NetworkManager patched, waiting for machine to reboot...")
 	return drivers.WaitForSSH(provisioner.Driver)
 }
 
