@@ -623,6 +623,10 @@ func replaceUserdataFile(machineName, machineOS string, userdataContent, customS
 	case bytes.HasPrefix(userdataContent, []byte("#cloud-config")):
 		// The user provided a cloud-config file, so the customInstallScript context is added to the
 		// "runcmd" section of the YAML.
+
+		// Remove duplicated "\" in line breaks
+		userdataContent = bytes.Replace(userdataContent, []byte("\\n"), []byte("\n"), -1)
+
 		if err := yaml.Unmarshal(userdataContent, &cf); err != nil {
 			return err
 		}
