@@ -53,6 +53,7 @@ type Options struct {
 	Memory              int
 	Disk                int
 	CustomInstallScript string
+	HostnameOverride    string
 	MachineOS           string
 	EngineOptions       *engine.Options
 	SwarmOptions        *swarm.Options
@@ -303,7 +304,7 @@ func (h *Host) Provision() error {
 
 	if h.HostOptions.CustomInstallScript != "" {
 		log.Infof("Machine %s was provisioned with a custom install script, using this script for provisioning", h.Name)
-		return provision.WithCustomScript(provisioner, h.HostOptions.CustomInstallScript)
+		return provision.WithCustomScript(provisioner, h.HostOptions.CustomInstallScript, h.HostOptions.HostnameOverride)
 	}
 
 	return provisioner.Provision(*h.HostOptions.SwarmOptions, *h.HostOptions.AuthOptions, *h.HostOptions.EngineOptions)

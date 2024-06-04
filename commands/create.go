@@ -138,6 +138,11 @@ var (
 			Usage: "Use a custom provisioning script instead of installing docker",
 			Value: "",
 		},
+		cli.StringFlag{
+			Name:  "hostname-override",
+			Usage: "Specify hostname to use during cloud-init instead of default generated hostname",
+			Value: "",
+		},
 	}
 )
 
@@ -231,6 +236,7 @@ func cmdCreateInner(c CommandLine, api libmachine.API) error {
 	osFlag := drivers.DriverOSFlag(h.Driver)
 
 	customInstallScript := c.String("custom-install-script")
+	h.HostOptions.HostnameOverride = c.String("hostname-override")
 	if customInstallScript != "" {
 		h.HostOptions.CustomInstallScript = customInstallScript
 		h.HostOptions.AuthOptions = nil
@@ -238,7 +244,7 @@ func cmdCreateInner(c CommandLine, api libmachine.API) error {
 		h.HostOptions.SwarmOptions = nil
 
 		if userdataFlag != "" {
-			err = updateUserdataFile(driverOpts, name, userdataFlag, osFlag, customInstallScript)
+			err = updateUserdataFile(driverOpts, name, h.HostOptions.HostnameOverride, userdataFlag, osFlag, customInstallScript)
 			if err != nil {
 				return fmt.Errorf("[cmdCreateInner] could not alter cloud-init file: %v", err)
 			}
@@ -498,7 +504,7 @@ func gzipEncode(data []byte) (string, error) {
 // updateUserdataFile If the user has provided a userdata file, then we add the customInstallScript to their userdata file.
 // This assumes that the user-provided userdata file start with a shebang or `#cloud-config`
 // If the user has not provided any userdata file, then we set the customInstallScript as the userdata file.
-func updateUserdataFile(driverOpts *rpcdriver.RPCFlags, machineName, userdataFlag, osFlag, customInstallScript string) error {
+func updateUserdataFile(driverOpts *rpcdriver.RPCFlags, machineName, hostname, userdataFlag, osFlag, customInstallScript string) error {
 	var userdataContent []byte
 	var err error
 	userdataFile := driverOpts.String(userdataFlag)
@@ -508,13 +514,13 @@ func updateUserdataFile(driverOpts *rpcdriver.RPCFlags, machineName, userdataFla
 		// Always convert to cloud config if user data is not provided
 		userdataContent = []byte("#cloud-config")
 	} else {
-		userdataContent, err = ioutil.ReadFile(userdataFile)
+		userdataContent, err = os.ReadFile(userdataFile)
 		if err != nil {
 			return err
 		}
 	}
 
-	customScriptContent, err := ioutil.ReadFile(customInstallScript)
+	customScriptContent, err := os.ReadFile(customInstallScript)
 	if err != nil {
 		return err
 	}
@@ -523,11 +529,11 @@ func updateUserdataFile(driverOpts *rpcdriver.RPCFlags, machineName, userdataFla
 
 	modifiedUserdataFile, err := ioutil.TempFile("", "modified-user-data")
 	if err != nil {
-		return fmt.Errorf("[updateUserdataFile] unable to created tempfile [%v]\nError returned\n[%v]", modifiedUserdataFile, err)
+		return fmt.Errorf("[updateUserdataFile] unable to create tempfile [%v]\nError returned\n[%v]", modifiedUserdataFile, err)
 	}
 	defer modifiedUserdataFile.Close()
 
-	if err := replaceUserdataFile(machineName, machineOS, userdataContent, customScriptContent, modifiedUserdataFile); err != nil {
+	if err := replaceUserdataFile(machineName, machineOS, hostname, userdataContent, customScriptContent, modifiedUserdataFile); err != nil {
 		return err
 	}
 
@@ -540,9 +546,10 @@ func updateUserdataFile(driverOpts *rpcdriver.RPCFlags, machineName, userdataFla
 // and passes the script path to commonCloudConfig
 // RK - sets the hostname based on OS as cloud-init (linux) and cloudbase-init (windows) diverge
 // on how hostnames are set in cloud-config (userdata)
-func writeCloudConfig(machineName, encodedData, machineOS string, cf map[interface{}]interface{}, newUserDataFile *os.File) error {
+func writeCloudConfig(machineName, encodedData, machineOS, hostname string, cf map[interface{}]interface{}, newUserDataFile *os.File) error {
 	command := "sh"
 	path := "/usr/local/custom_script/install.sh"
+	key := "hostname"
 	if strings.Contains(machineOS, "windows") {
 		// the writeFile path should ideally be C:\usr\local\custom_script\install.ps1
 		// however, we can't guarantee that directory exists or can be created on the target machine
@@ -551,37 +558,36 @@ func writeCloudConfig(machineName, encodedData, machineOS string, cf map[interfa
 		// set_hostname is a cloudbase-init specific cloud-config parameter
 		// that is only pertinent for windows VMs
 		// https://cloudbase-init.readthedocs.io/en/latest/userdata.html
-		if err := addToCloudConfig(cf, "set_hostname", machineName); err != nil {
-			log.Debugf("[writeCloudConfig] wrote set_hostname field for %s machine %s", machineName, machineOS)
-			return err
-		}
-	} else {
-		// Add the hostname
-		if _, ok := cf["hostname"]; !ok {
-			cf["hostname"] = machineName
-			log.Debugf("[writeCloudConfig] wrote hostname field for %s machine %s", machineName, machineOS)
-		}
+		key = "set_hostname"
 	}
-	return commonCloudConfig(machineName, machineOS, encodedData, command, path, cf, newUserDataFile)
+	if _, ok := cf[key]; !ok {
+		if hostname != "" {
+			cf[key] = hostname
+		} else {
+			cf[key] = machineName
+		}
+		log.Debugf("[writeCloudConfig] wrote %s field for %s machine %s", key, machineOS, machineName)
+	}
+	return commonCloudConfig(encodedData, command, path, cf, newUserDataFile)
 }
 
 // commonCloudConfig contains the shared cloud-config logic for writeCloudConfig
 // it adds content to the write_files directive of the cloud-config file as well as sets the hostname
 // the content added is based on the OS passed with a hard default to linux
 // windows is the only other supported OS
-func commonCloudConfig(machineName, machineOS, encodedData, command, path string, cf map[interface{}]interface{}, newUserDataFile *os.File) error {
+func commonCloudConfig(encodedData, command, path string, cf map[interface{}]interface{}, newUserDataFile *os.File) error {
 	writeFile := map[string]string{
 		"encoding":    "gzip+b64",
 		"content":     fmt.Sprintf("%s", encodedData),
 		"permissions": "0644",
 		"path":        path,
 	}
-	if err := addToCloudConfig(cf, "write_files", writeFile); err != nil {
+	if err := appendValueToListInCloudConfig(cf, "write_files", writeFile); err != nil {
 		return err
 	}
 
 	// Add to the runcmd directive
-	if err := addToCloudConfig(cf, "runcmd", fmt.Sprintf("%s %s", command, writeFile["path"])); err != nil {
+	if err := appendValueToListInCloudConfig(cf, "runcmd", fmt.Sprintf("%s %s", command, writeFile["path"])); err != nil {
 		return err
 	}
 
@@ -602,7 +608,7 @@ func commonCloudConfig(machineName, machineOS, encodedData, command, path string
 // temp file for this content.
 // If the user-provided userdata file starts with a shebang, then we can add it to the customScriptContent and add data to the `runcmd` directive.
 // fi the user-provided userdata file is in cloud-config format, then we add the customScriptContent to the `runcmd` directive.
-func replaceUserdataFile(machineName, machineOS string, userdataContent, customScriptContent []byte, newUserDataFile *os.File) error {
+func replaceUserdataFile(machineName, machineOS, hostname string, userdataContent, customScriptContent []byte, newUserDataFile *os.File) error {
 	var err error
 	var encodedData string
 	cf := make(map[interface{}]interface{})
@@ -640,11 +646,11 @@ func replaceUserdataFile(machineName, machineOS string, userdataContent, customS
 		return fmt.Errorf("existing userdata file does not begin with '#!' or '#cloud-config'")
 	}
 
-	return writeCloudConfig(machineName, encodedData, machineOS, cf, newUserDataFile)
+	return writeCloudConfig(machineName, encodedData, machineOS, hostname, cf, newUserDataFile)
 }
 
-// addToCloudConfig lets you easily add key:value pairs to the cloud-config file
-func addToCloudConfig(cf map[interface{}]interface{}, key string, value interface{}) error {
+// appendValueToListInCloudConfig appends a value to a list or creates one if it does not exist at the given key within the cloud config
+func appendValueToListInCloudConfig(cf map[interface{}]interface{}, key string, value interface{}) error {
 	switch section := cf[key].(type) {
 	case []interface{}:
 		section = append(section, value)
