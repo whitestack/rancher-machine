@@ -2,6 +2,7 @@ package digitalocean
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"net"
@@ -13,6 +14,7 @@ import (
 
 	"github.com/digitalocean/godo"
 	"github.com/rancher/machine/libmachine/drivers"
+	rpcdriver "github.com/rancher/machine/libmachine/drivers/rpc"
 	"github.com/rancher/machine/libmachine/log"
 	"github.com/rancher/machine/libmachine/mcnflag"
 	"github.com/rancher/machine/libmachine/mcnutils"
@@ -150,6 +152,33 @@ func (d *Driver) GetSSHHostname() (string, error) {
 // DriverName returns the name of the driver
 func (d *Driver) DriverName() string {
 	return "digitalocean"
+}
+
+// UnmarshalJSON loads driver config from JSON. This function is used by the RPCServerDriver that wraps
+// all drivers as a means of populating an already-initialized driver with new configuration.
+// See `RPCServerDriver.SetConfigRaw`.
+func (d *Driver) UnmarshalJSON(data []byte) error {
+	// Unmarshal driver config into an aliased type to prevent infinite recursion on UnmarshalJSON.
+	type targetDriver Driver
+
+	// Copy data from `d` to `target` before unmarshalling. This will ensure that already-initialized values
+	// from `d` that are left untouched during unmarshal (like functions) are preserved.
+	target := targetDriver(*d)
+
+	if err := json.Unmarshal(data, &target); err != nil {
+		return fmt.Errorf("error unmarshalling driver config from JSON: %w", err)
+	}
+
+	// Copy unmarshalled data back to `d`.
+	*d = Driver(target)
+
+	// Make sure to reload values that are subject to change from envvars and os.Args.
+	driverOpts := rpcdriver.GetDriverOpts(d.GetCreateFlags(), os.Args)
+	if _, ok := driverOpts.Values["digitalocean-access-token"]; ok {
+		d.AccessToken = driverOpts.String("digitalocean-access-token")
+	}
+
+	return nil
 }
 
 func (d *Driver) SetConfigFromFlags(flags drivers.DriverOptions) error {

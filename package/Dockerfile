@@ -1,9 +1,9 @@
-FROM registry.suse.com/bci/bci-base:15.4.27.14.23
+FROM registry.suse.com/bci/bci-base:15.5
 
 ENV SSL_CERT_DIR /etc/rancher/ssl
 
 RUN zypper -n update && \
-    zypper -n install git-core curl ca-certificates unzip mkisofs xz gzip sed tar && \
+    zypper -n install git-core curl ca-certificates unzip mkisofs xz gzip sed tar openssh-clients && \
     zypper -n clean -a && \
     rm -rf /tmp/* /var/tmp/* /usr/share/doc/packages/*
 

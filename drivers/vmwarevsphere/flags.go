@@ -1,12 +1,15 @@
 package vmwarevsphere
 
 import (
+	"encoding/json"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"os"
 	"strings"
 
 	"github.com/rancher/machine/libmachine/drivers"
+	rpcdriver "github.com/rancher/machine/libmachine/drivers/rpc"
 	"github.com/rancher/machine/libmachine/mcnflag"
 	"github.com/vmware/govmomi/vim25/types"
 )
@@ -196,7 +199,55 @@ func (d *Driver) GetCreateFlags() []mcnflag.Flag {
 			Name:   "vmwarevsphere-custom-attribute",
 			Usage:  "vSphere custom attribute, format key/value e.g. '200=my custom value'",
 		},
+		mcnflag.IntFlag{
+			EnvVar: "VSPHERE_GRACEFUL_SHUTDOWN_TIMEOUT",
+			Name:   "vmwarevsphere-graceful-shutdown-timeout",
+			Usage:  "How many seconds to wait before timing out when attempting a graceful shutdown for a vSphere virtual machine. A force destroy will perform when the value is zero.",
+		},
 	}
+}
+
+// UnmarshalJSON loads driver config from JSON. This function is used by the RPCServerDriver that wraps
+// all drivers as a means of populating an already-initialized driver with new configuration.
+// See `RPCServerDriver.SetConfigRaw`.
+func (d *Driver) UnmarshalJSON(data []byte) error {
+	// Unmarshal driver config into an aliased type to prevent infinite recursion on UnmarshalJSON.
+	type targetDriver Driver
+
+	// Copy data from `d` to `target` before unmarshalling. This will ensure that already-initialized values
+	// from `d` that are left untouched during unmarshal (like functions) are preserved.
+	target := targetDriver(*d)
+
+	if err := json.Unmarshal(data, &target); err != nil {
+		return fmt.Errorf("error unmarshalling driver config from JSON: %w", err)
+	}
+
+	// Copy unmarshalled data back to `d`.
+	*d = Driver(target)
+
+	// Make sure to reload values that are subject to change from envvars and os.Args.
+	driverOpts := rpcdriver.GetDriverOpts(d.GetCreateFlags(), os.Args)
+	if _, ok := driverOpts.Values["vmwarevsphere-ssh-user"]; ok {
+		d.SSHUser = driverOpts.String("vmwarevsphere-ssh-user")
+	}
+
+	if _, ok := driverOpts.Values["vmwarevsphere-ssh-password"]; ok {
+		d.SSHPassword = driverOpts.String("vmwarevsphere-ssh-password")
+	}
+
+	if _, ok := driverOpts.Values["vmwarevsphere-vcenter"]; ok {
+		d.IP = driverOpts.String("vmwarevsphere-vcenter")
+	}
+
+	if _, ok := driverOpts.Values["vmwarevsphere-username"]; ok {
+		d.Username = driverOpts.String("vmwarevsphere-username")
+	}
+
+	if _, ok := driverOpts.Values["vmwarevsphere-password"]; ok {
+		d.Password = driverOpts.String("vmwarevsphere-password")
+	}
+
+	return nil
 }
 
 func (d *Driver) SetConfigFromFlags(flags drivers.DriverOptions) error {
@@ -258,6 +309,11 @@ func (d *Driver) SetConfigFromFlags(flags drivers.DriverOptions) error {
 		if d.CloneFrom == "" {
 			return fmt.Errorf("creation type clone needs a VM name to clone from, use --vmwarevsphere-clone-from")
 		}
+	}
+
+	d.GracefulShutdownTimeout = flags.Int("vmwarevsphere-graceful-shutdown-timeout")
+	if d.GracefulShutdownTimeout < 0 {
+		return errors.New("vmwarevsphere-graceful-shutdown-timeout can not be negative")
 	}
 
 	return nil

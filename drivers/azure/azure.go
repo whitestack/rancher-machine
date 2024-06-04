@@ -3,6 +3,7 @@ package azure
 import (
 	"context"
 	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io/ioutil"
@@ -15,6 +16,7 @@ import (
 	"github.com/Azure/go-autorest/autorest/azure"
 	"github.com/rancher/machine/drivers/azure/azureutil"
 	"github.com/rancher/machine/libmachine/drivers"
+	rpcdriver "github.com/rancher/machine/libmachine/drivers/rpc"
 	"github.com/rancher/machine/libmachine/log"
 	"github.com/rancher/machine/libmachine/mcnflag"
 	"github.com/rancher/machine/libmachine/state"
@@ -318,6 +320,45 @@ func (d *Driver) GetCreateFlags() []mcnflag.Flag {
 			EnvVar: "AZURE_ACCELERATED_NETWORKING",
 		},
 	}
+}
+
+// UnmarshalJSON loads driver config from JSON. This function is used by the RPCServerDriver that wraps
+// all drivers as a means of populating an already-initialized driver with new configuration.
+// See `RPCServerDriver.SetConfigRaw`.
+func (d *Driver) UnmarshalJSON(data []byte) error {
+	// Unmarshal driver config into an aliased type to prevent infinite recursion on UnmarshalJSON.
+	type targetDriver Driver
+
+	// Copy data from `d` to `target` before unmarshalling. This will ensure that already-initialized values
+	// from `d` that are left untouched during unmarshal (like functions) are preserved.
+	target := targetDriver(*d)
+
+	if err := json.Unmarshal(data, &target); err != nil {
+		return fmt.Errorf("error unmarshalling driver config from JSON: %w", err)
+	}
+
+	// Copy unmarshalled data back to `d`.
+	*d = Driver(target)
+
+	// Make sure to reload values that are subject to change from envvars and os.Args.
+	driverOpts := rpcdriver.GetDriverOpts(d.GetCreateFlags(), os.Args)
+	if _, ok := driverOpts.Values[flAzureEnvironment]; ok {
+		d.Environment = driverOpts.String(flAzureEnvironment)
+	}
+
+	if _, ok := driverOpts.Values[flAzureSubscriptionID]; ok {
+		d.SubscriptionID = driverOpts.String(flAzureSubscriptionID)
+	}
+
+	if _, ok := driverOpts.Values[flAzureClientID]; ok {
+		d.ClientID = driverOpts.String(flAzureClientID)
+	}
+
+	if _, ok := driverOpts.Values[flAzureClientSecret]; ok {
+		d.ClientSecret = driverOpts.String(flAzureClientSecret)
+	}
+
+	return nil
 }
 
 // SetConfigFromFlags initializes driver values from the command line values
