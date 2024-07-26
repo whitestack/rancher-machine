@@ -136,10 +136,12 @@ func (api *Client) Create(h *host.Host) error {
 	log.Info("Creating machine...")
 
 	if err := api.performCreate(h); err != nil {
-		// it is possible that the VM is instantiated but fails to bootstrap,
-		// save the machine to the store, so the VM and associated resources can be found and destroyed later
-		if err := api.Save(h); err != nil {
-			log.Warnf("Error saving host to store after creation fails: %s", err)
+		if h.Driver.DriverName() == "vmwarevsphere" {
+			// it is possible that the VM is instantiated but fails to bootstrap,
+			// save the machine to the store, so the VM and associated resources can be found and destroyed later
+			if err := api.Save(h); err != nil {
+				log.Warnf("Error saving host to store after creation fails: %s", err)
+			}
 		}
 		return fmt.Errorf("Error creating machine: %s", err)
 	}
