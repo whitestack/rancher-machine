@@ -2,7 +2,7 @@ module github.com/rancher/machine
 
 go 1.22.0
 
-toolchain go1.22.1
+toolchain go1.22.5
 
 replace (
 	github.com/docker/docker => github.com/moby/moby v1.4.2-0.20170731201646-1009e6a40b29
