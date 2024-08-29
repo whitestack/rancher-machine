@@ -23,7 +23,7 @@ require (
 	github.com/gophercloud/gophercloud v0.7.0
 	github.com/gophercloud/utils v0.0.0-20191129022341-463e26ffa30d
 	github.com/rackspace/gophercloud v0.0.0-20150408191457-ce0f487f6747
-	github.com/rancher/wrangler/v3 v3.0.0-rc2
+	github.com/rancher/wrangler/v3 v3.0.0
 	github.com/samalba/dockerclient v0.0.0-20151231000007-f661dd4754aa
 	github.com/skarademir/naturalsort v0.0.0-20150715044055-69a5d87bef62
 	github.com/stretchr/testify v1.9.0
@@ -74,7 +74,7 @@ require (
 	github.com/google/go-querystring v0.0.0-20140804062624-30f7a39f4a21 // indirect
 	github.com/google/gofuzz v1.2.0 // indirect
 	github.com/google/s2a-go v0.1.4 // indirect
-	github.com/google/uuid v1.3.0 // indirect
+	github.com/google/uuid v1.6.0 // indirect
 	github.com/googleapis/enterprise-certificate-proxy v0.2.3 // indirect
 	github.com/googleapis/gax-go/v2 v2.11.0 // indirect
 	github.com/gorilla/mux v1.7.3 // indirect
@@ -91,7 +91,7 @@ require (
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
-	github.com/rancher/lasso v0.0.0-20240430201833-6f3def65ffc5 // indirect
+	github.com/rancher/lasso v0.0.0-20240705194423-b2a060d103c1 // indirect
 	github.com/satori/go.uuid v1.2.1-0.20181016170032-d91630c85102 // indirect
 	github.com/sirupsen/logrus v1.9.3 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
