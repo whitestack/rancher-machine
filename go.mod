@@ -14,7 +14,7 @@ require (
 	github.com/Azure/go-autorest/autorest v0.11.27
 	github.com/Azure/go-autorest/autorest/adal v0.9.24
 	github.com/Azure/go-autorest/autorest/azure/auth v0.4.2
-	github.com/Azure/go-autorest/autorest/to v0.3.0
+	github.com/Azure/go-autorest/autorest/to v0.4.0
 	github.com/aws/aws-sdk-go v1.34.0
 	github.com/bugsnag/bugsnag-go v2.1.2+incompatible
 	github.com/digitalocean/godo v0.0.0-20170317202744-d59ed2fe842b
