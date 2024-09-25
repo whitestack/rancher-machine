@@ -7,9 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"strconv"
 	"strings"
-	"syscall"
 	"time"
 
 	"github.com/rancher/machine/libmachine/log"
@@ -168,24 +166,9 @@ func (lbe *Executor) Start() (*bufio.Scanner, *bufio.Scanner, error) {
 
 	// The child process that gets executed when we run this subcommand will already inherit all this process' envvars,
 	// but we still need to pass all command-line arguments to it manually.
-	cmd := exec.Command(lbe.binaryPath, os.Args...)
-	gid := os.Getenv(PluginGID)
-	uid := os.Getenv(PluginUID)
-	if uid != "" && gid != "" {
-		uid, err := strconv.Atoi(uid)
-		if err != nil {
-			return nil, nil, fmt.Errorf("error parsing user ID: %w", err)
-		}
-		gid, err := strconv.Atoi(gid)
-		if err != nil {
-			return nil, nil, fmt.Errorf("error parsing group ID: %w", err)
-		}
-		cmd.SysProcAttr = &syscall.SysProcAttr{
-			Credential: &syscall.Credential{
-				Uid: uint32(uid),
-				Gid: uint32(gid),
-			},
-		}
+	cmd, err := getCommand(lbe.binaryPath, os.Args...)
+	if err != nil {
+		return nil, nil, fmt.Errorf("Error getting cmd: %v", err)
 	}
 	lbe.cmd = cmd
 	lbe.pluginStdout, err = lbe.cmd.StdoutPipe()
