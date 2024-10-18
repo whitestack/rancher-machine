@@ -27,6 +27,7 @@ type Driver struct {
 	*drivers.BaseDriver
 	AuthUrl                     string
 	ActiveTimeout               int
+	AllowedAddressPairs         []AllowedAddressPair
 	Insecure                    bool
 	CaCert                      string
 	DomainId                    string
@@ -73,6 +74,11 @@ type Driver struct {
 	ExistingKey bool
 }
 
+type AllowedAddressPair struct {
+	IPAddress   string
+	NetworkName string
+}
+
 const (
 	defaultSSHUser       = "root"
 	defaultSSHPort       = 22
@@ -86,6 +92,11 @@ func (d *Driver) GetCreateFlags() []mcnflag.Flag {
 			Name:   "openstack-auth-url",
 			Usage:  "OpenStack authentication URL",
 			Value:  "",
+		},
+		mcnflag.StringSliceFlag{
+			EnvVar: "OS_ALLOWED_ADDRESS_PAIRS",
+			Name:   "openstack-allowed-address-pairs",
+			Usage:  "Allowed address pairs for the instance (format: IP/CIDR:NetworkName or IP/CIDR)",
 		},
 		mcnflag.BoolFlag{
 			EnvVar: "OS_INSECURE",
@@ -433,6 +444,17 @@ func (d *Driver) SetConfigFromFlags(flags drivers.DriverOptions) error {
 	if flags.String("openstack-net-name") != "" {
 		d.NetworkNames = strings.Split(flags.String("openstack-net-name"), ",")
 	}
+	rawAllowedAddressPairs := flags.StringSlice("openstack-allowed-address-pairs")
+	d.AllowedAddressPairs = make([]AllowedAddressPair, len(rawAllowedAddressPairs))
+	for i, pair := range rawAllowedAddressPairs {
+		parts := strings.SplitN(pair, ":", 2)
+		if len(parts) == 2 {
+			d.AllowedAddressPairs[i] = AllowedAddressPair{IPAddress: parts[0], NetworkName: parts[1]}
+		} else {
+			d.AllowedAddressPairs[i] = AllowedAddressPair{IPAddress: parts[0], NetworkName: d.NetworkNames[0]}
+		}
+	}
+
 	if flags.String("openstack-sec-groups") != "" {
 		d.SecurityGroups = strings.Split(flags.String("openstack-sec-groups"), ",")
 	}
@@ -512,7 +534,7 @@ func (d *Driver) GetIP() (string, error) {
 		}
 		time.Sleep(2 * time.Second)
 	}
-	return "", fmt.Errorf("No IP found for the machine")
+	return "", fmt.Errorf("no IP found for the machine")
 }
 
 func (d *Driver) GetState() (state.State, error) {
@@ -574,6 +596,11 @@ func (d *Driver) Create() error {
 			return err
 		}
 	}
+	log.Debug("Initiating instance creation...", map[string]string{
+		"MachineName": d.MachineName,
+		"FlavorId":    d.FlavorId,
+		"ImageId":     d.ImageId,
+	})
 	if err := d.createMachine(); err != nil {
 		return err
 	}
@@ -596,6 +623,12 @@ func (d *Driver) Create() error {
 	if err := d.lookForIPAddress(); err != nil {
 		return d.failedToCreate(err)
 	}
+
+	log.Info("OpenStack instance created successfully", map[string]string{
+		"MachineId": d.MachineId,
+		"IPAddress": d.IPAddress,
+	})
+
 	return nil
 }
 
@@ -921,6 +954,13 @@ func (d *Driver) createMachine() error {
 		return err
 	}
 	d.MachineId = instanceID
+	log.Debug("Machine created...", map[string]string{
+		"MachineId":   d.MachineId,
+		"MachineName": d.MachineName,
+	})
+	if err := d.client.AddAllowedAddressPairs(d); err != nil {
+		return err
+	}
 	return nil
 }
 
