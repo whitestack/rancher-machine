@@ -26,3 +26,7 @@ can make and distribute their own plugin for any virtualization technology or
 cloud provider.  To browse the list of known Rancher Machine plugins, please [see
 this document in our
 docs repo](https://github.com/docker/docker.github.io/blob/master/machine/AVAILABLE_DRIVER_PLUGINS.md).
+
+## WARNING
+
+- Waiting for the [PR](https://github.com/rancher/machine/pull/36) to be merged so we can upload our changes to rancher/machine.

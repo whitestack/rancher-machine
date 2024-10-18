@@ -30,6 +30,7 @@ import (
 
 type Client interface {
 	Authenticate(d *Driver) error
+	AddAllowedAddressPairs(d *Driver) error
 	InitComputeClient(d *Driver) error
 	InitNetworkClient(d *Driver) error
 	InitBlockStorageClient(d *Driver) error
@@ -127,7 +128,108 @@ func (c *GenericClient) CreateInstance(d *Driver) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	log.Info("Waiting for the instance to become ACTIVE...")
+	err = servers.WaitForStatus(c.Compute, server.ID, "ACTIVE", 600)
+	if err != nil {
+		return "", err
+	}
 	return server.ID, nil
+}
+
+func (c *GenericClient) AddAllowedAddressPairs(d *Driver) error {
+	if len(d.AllowedAddressPairs) > 0 {
+		log.Debug("Processing Allowed Address Pairs", map[string]interface{}{
+			"Count": len(d.AllowedAddressPairs),
+		})
+
+		portList, err := c.GetInstancePorts(d)
+		if err != nil {
+			return err
+		}
+
+		for _, pair := range d.AllowedAddressPairs {
+			var portID string
+			for _, port := range portList {
+				if port.NetworkName == pair.NetworkName {
+					portID = port.ID
+					break
+				}
+			}
+
+			if portID == "" {
+				return fmt.Errorf("no port found for the network %s", pair.NetworkName)
+			}
+
+			log.Debug("Updating port with allowed address pair", map[string]string{
+				"PortID":           portID,
+				"IPAllowedAddress": pair.IPAddress,
+				"Network":          pair.NetworkName,
+			})
+
+			allowedAddressPairs := []ports.AddressPair{
+				{IPAddress: pair.IPAddress},
+			}
+
+			updateOpts := ports.UpdateOpts{
+				AllowedAddressPairs: &allowedAddressPairs,
+			}
+
+			_, err = ports.Update(c.Network, portID, updateOpts).Extract()
+			if err != nil {
+				return fmt.Errorf("error updating port %s with allowed address pair: %v", portID, err)
+			}
+		}
+
+		log.Debug("All ports updated successfully with allowed address pairs")
+	}
+	return nil
+}
+
+func (c *GenericClient) GetInstancePorts(d *Driver) ([]Port, error) {
+	var instancePorts []Port
+
+	listOpts := ports.ListOpts{
+		DeviceID: d.MachineId,
+	}
+
+	allPages, err := ports.List(c.Network, listOpts).AllPages()
+	if err != nil {
+		return nil, fmt.Errorf("error listing ports: %v", err)
+	}
+
+	allPorts, err := ports.ExtractPorts(allPages)
+	if err != nil {
+		return nil, fmt.Errorf("error extracting ports: %v", err)
+	}
+
+	for _, port := range allPorts {
+		networkName, err := c.getNetworkName(port.NetworkID)
+		if err != nil {
+			return nil, err
+		}
+
+		instancePorts = append(instancePorts, Port{
+			ID:          port.ID,
+			NetworkID:   port.NetworkID,
+			NetworkName: networkName,
+		})
+	}
+
+	return instancePorts, nil
+}
+
+func (c *GenericClient) getNetworkName(networkID string) (string, error) {
+	network, err := networks.Get(c.Network, networkID).Extract()
+	if err != nil {
+		return "", fmt.Errorf("error getting network details: %v", err)
+	}
+	return network.Name, nil
+}
+
+type Port struct {
+	ID          string
+	NetworkID   string
+	NetworkName string
 }
 
 func (c *GenericClient) VolumeCreate(d *Driver) (string, error) {
@@ -245,7 +347,7 @@ func (c *GenericClient) WaitForInstanceStatus(d *Driver, status string) error {
 		}
 
 		if current.Status == "ERROR" {
-			return true, fmt.Errorf("Instance creation failed. Instance is in ERROR state")
+			return true, fmt.Errorf("instance creation failed. Instance is in ERROR state")
 		}
 
 		if current.Status == status {
@@ -261,7 +363,7 @@ func (c *GenericClient) GetInstanceIPAddresses(d *Driver) ([]IPAddress, error) {
 	if err != nil {
 		return nil, err
 	}
-	addresses := []IPAddress{}
+	var addresses []IPAddress
 	for network, networkAddresses := range server.Addresses {
 		for _, element := range networkAddresses.([]interface{}) {
 			address := element.(map[string]interface{})
@@ -573,34 +675,44 @@ func (c *GenericClient) getNeutronNetworkFloatingIPs(d *Driver, opts *floatingip
 }
 
 func (c *GenericClient) GetInstancePortID(d *Driver) (string, error) {
-	var portID string
-	for _, networkID := range d.NetworkIds {
-		pager := ports.List(c.Network, ports.ListOpts{
-			DeviceID:  d.MachineId,
-			NetworkID: networkID,
+	log.Debug("Searching for instance port", map[string]string{"MachineId": d.MachineId})
+
+	listOpts := ports.ListOpts{
+		DeviceID: d.MachineId,
+	}
+
+	allPages, err := ports.List(c.Network, listOpts).AllPages()
+	if err != nil {
+		return "", fmt.Errorf("error listing ports: %v", err)
+	}
+
+	allPorts, err := ports.ExtractPorts(allPages)
+	if err != nil {
+		return "", fmt.Errorf("error extracting ports: %v", err)
+	}
+
+	log.Debug("Found ports for instance", map[string]interface{}{
+		"MachineId": d.MachineId,
+		"PortCount": len(allPorts),
+	})
+
+	for _, port := range allPorts {
+		log.Debug("Examining port", map[string]string{
+			"PortID":    port.ID,
+			"NetworkID": port.NetworkID,
 		})
-
-		err := pager.EachPage(func(page pagination.Page) (bool, error) {
-			portList, err := ports.ExtractPorts(page)
-			if err != nil {
-				return false, err
+		for _, networkID := range d.NetworkIds {
+			if port.NetworkID == networkID {
+				log.Debug("Matching port found", map[string]string{
+					"PortID":    port.ID,
+					"NetworkID": networkID,
+				})
+				return port.ID, nil
 			}
-			for _, port := range portList {
-				portID = port.ID
-				return false, nil
-			}
-			return true, nil
-		})
-
-		if err != nil {
-			return "", err
-		}
-
-		if portID != "" {
-			break
 		}
 	}
-	return portID, nil
+
+	return "", fmt.Errorf("no matching port found for the specified networks: %v", d.NetworkIds)
 }
 
 func (c *GenericClient) InitComputeClient(d *Driver) error {
@@ -730,7 +842,7 @@ func (c *GenericClient) SetTLSConfig(d *Driver) error {
 
 		ok := certpool.AppendCertsFromPEM(pem)
 		if !ok {
-			return fmt.Errorf("Ill-formed CA certificate(s) PEM file")
+			return fmt.Errorf("ill-formed CA certificate(s) PEM file")
 		}
 		config.RootCAs = certpool
 	}
