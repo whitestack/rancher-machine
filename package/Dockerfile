@@ -32,8 +32,10 @@ COPY --from=builder /chroot /
 
 RUN mkdir -p .docker/machine/machines /etc/rancher/ssl /home/machine && \
     chown -R machine /etc/rancher/ssl && \
-    chown -R machine /home/machine
+    chown -R machine /home/machine && \
+    chown machine /usr/local/bin
 
 USER 1000
+WORKDIR /home/machine
 
 ENTRYPOINT ["entrypoint.sh"]
