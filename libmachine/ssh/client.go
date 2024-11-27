@@ -3,7 +3,6 @@ package ssh
 import (
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net"
 	"os"
 	"os/exec"
@@ -136,7 +135,7 @@ func NewNativeConfig(user string, auth *Auth) (ssh.ClientConfig, error) {
 	)
 
 	for _, k := range auth.Keys {
-		key, err := ioutil.ReadFile(k)
+		key, err := os.ReadFile(k)
 		if err != nil {
 			return ssh.ClientConfig{}, err
 		}
@@ -249,7 +248,7 @@ func (client *NativeClient) Start(command string) (io.ReadCloser, io.ReadCloser,
 
 	client.openClient = conn
 	client.openSession = session
-	return ioutil.NopCloser(stdout), ioutil.NopCloser(stderr), nil
+	return io.NopCloser(stdout), io.NopCloser(stderr), nil
 }
 
 func (client *NativeClient) Wait() error {
