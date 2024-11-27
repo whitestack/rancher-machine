@@ -3,7 +3,6 @@ package openstack
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
 	"net"
 	"net/http"
 	"os"
@@ -476,7 +475,7 @@ func (d *Driver) SetConfigFromFlags(flags drivers.DriverOptions) error {
 	d.VolumeSize = flags.Int("openstack-volume-size")
 
 	if flags.String("openstack-user-data-file") != "" {
-		userData, err := ioutil.ReadFile(flags.String("openstack-user-data-file"))
+		userData, err := os.ReadFile(flags.String("openstack-user-data-file"))
 		if err == nil {
 			d.UserData = userData
 		} else {
@@ -895,7 +894,7 @@ func (d *Driver) loadSSHKey() error {
 		return err
 	}
 	log.Debug("Loading Private Key from", d.PrivateKeyFile)
-	privateKey, err := ioutil.ReadFile(d.PrivateKeyFile)
+	privateKey, err := os.ReadFile(d.PrivateKeyFile)
 	if err != nil {
 		return err
 	}
@@ -903,10 +902,10 @@ func (d *Driver) loadSSHKey() error {
 	if err != nil {
 		return err
 	}
-	if err := ioutil.WriteFile(d.privateSSHKeyPath(), privateKey, 0600); err != nil {
+	if err := os.WriteFile(d.privateSSHKeyPath(), privateKey, 0600); err != nil {
 		return err
 	}
-	if err := ioutil.WriteFile(d.publicSSHKeyPath(), publicKey, 0600); err != nil {
+	if err := os.WriteFile(d.publicSSHKeyPath(), publicKey, 0600); err != nil {
 		return err
 	}
 
@@ -919,7 +918,7 @@ func (d *Driver) createSSHKey() error {
 	if err := ssh.GenerateSSHKey(d.GetSSHKeyPath()); err != nil {
 		return err
 	}
-	publicKey, err := ioutil.ReadFile(d.publicSSHKeyPath())
+	publicKey, err := os.ReadFile(d.publicSSHKeyPath())
 	if err != nil {
 		return err
 	}
